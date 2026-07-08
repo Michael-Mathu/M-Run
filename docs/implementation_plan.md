@@ -645,6 +645,13 @@ CREATE INDEX idx_activities_track ON activities USING GIST(track);
 - Legend detail page: bio, timeline, records, quotes, gallery
 - "Challenge Me" button → navigate to Beat the Legends flow
 
+> **Implemented scope:** the shipped build expanded this to **30 legends** (Step 2 added 10 more —
+> Tirunesh Dibaba, Meseret Defar, Sifan Hassan, Catherine Ndereba, Edna Kiplagat, Moses Tanui,
+> Ibrahim Hussein, Abel Mutai, Ezekiel Kemboi, plus the existing 20) with new fields (personal
+> bests, training philosophy, rivalries, notable races, categorized quotes, fun facts, related
+> legends), country/discipline/era filter chips, a "How You Compare" panel, and a
+> "Legend of the Day/Week" home card.
+
 ---
 
 #### 2.3 Beat the Legends (5 Initial Ghost Paces)
@@ -669,7 +676,10 @@ CREATE INDEX idx_activities_track ON activities USING GIST(track);
 - On completion: compare total time, show result, award badge if applicable
 - Progressive unlock: complete Tier 1 legends (easier paces) to unlock Tier 2
 
----
+> **Implemented scope:** the shipped build now has **12 ghost paces** with a **Bronze / Silver /
+> Gold / G.O.A.T.** tier system — each pace is scaled to 125% / 110% / 102% / 100% of the record
+> time, and the header, splits chart, description, and race target rescale live with the selected
+> tier. (The in-run ghost marker and real-time comparison from the plan are not yet built.)
 
 ### Month 6–7: Full Challenges & Gamification
 

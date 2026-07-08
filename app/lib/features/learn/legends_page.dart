@@ -13,6 +13,9 @@ class LegendsPage extends StatefulWidget {
 class _LegendsPageState extends State<LegendsPage> {
   final _q = TextEditingController();
   String _query = '';
+  String _country = 'All';
+  String _discipline = 'All';
+  String _era = 'All';
 
   @override
   void dispose() {
@@ -20,16 +23,28 @@ class _LegendsPageState extends State<LegendsPage> {
     super.dispose();
   }
 
+  List<Legend> get _filtered {
+    final q = _query.toLowerCase();
+    return legends.where((l) {
+      if (q.isNotEmpty &&
+          !(l.name.toLowerCase().contains(q) ||
+              l.country.toLowerCase().contains(q) ||
+              l.discipline.toLowerCase().contains(q))) {
+        return false;
+      }
+      if (_country != 'All' && !l.country.startsWith(_country)) return false;
+      if (_discipline != 'All' && !l.discipline.toLowerCase().contains(_discipline.toLowerCase())) {
+        return false;
+      }
+      if (_era != 'All' && l.eraLabel != _era) return false;
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final items = legends.where((l) {
-      final q = _query.toLowerCase();
-      return q.isEmpty ||
-          l.name.toLowerCase().contains(q) ||
-          l.country.toLowerCase().contains(q) ||
-          l.discipline.toLowerCase().contains(q);
-    }).toList();
+    final text = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Legends'), centerTitle: false),
@@ -55,21 +70,119 @@ class _LegendsPageState extends State<LegendsPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: AppTheme.s16),
+                const SizedBox(height: AppTheme.s12),
+                _ChipRow(
+                  label: 'Country',
+                  options: const ['All', 'Kenya', 'Ethiopia', 'Uganda'],
+                  selected: _country,
+                  onSelected: (v) => setState(() => _country = v),
+                ),
+                const SizedBox(height: AppTheme.s8),
+                _ChipRow(
+                  label: 'Discipline',
+                  options: const [
+                    'All',
+                    'Marathon',
+                    '5000m',
+                    '10,000m',
+                    '1500m',
+                    '800m',
+                    'Half Marathon',
+                    'Cross Country',
+                  ],
+                  selected: _discipline,
+                  onSelected: (v) => setState(() => _discipline = v),
+                ),
+                const SizedBox(height: AppTheme.s8),
+                _ChipRow(
+                  label: 'Era',
+                  options: const ['All', '1960s–70s', '1980s–90s', '2000s–10s', '2020s+'],
+                  selected: _era,
+                  onSelected: (v) => setState(() => _era = v),
+                ),
+                const SizedBox(height: AppTheme.s12),
               ]),
             ),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(AppTheme.s24, 0, AppTheme.s24, AppTheme.s24),
-            sliver: SliverGrid.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: AppTheme.s12,
-              crossAxisSpacing: AppTheme.s12,
-              childAspectRatio: 0.92,
-              children: items.map((l) => _LegendCard(legend: l)).toList(),
-            ),
+            sliver: _filtered.isEmpty
+                ? SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: AppTheme.s32),
+                      child: Text('No legends match your filters.',
+                          style: text.bodyMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
+                          textAlign: TextAlign.center),
+                    ),
+                  )
+                : SliverGrid.count(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: AppTheme.s12,
+                    crossAxisSpacing: AppTheme.s12,
+                    childAspectRatio: 0.92,
+                    children: _filtered.map((l) => _LegendCard(legend: l)).toList(),
+                  ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ChipRow extends StatelessWidget {
+  final String label;
+  final List<String> options;
+  final String selected;
+  final ValueChanged<String> onSelected;
+  const _ChipRow({
+    required this.label,
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: options.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppTheme.s8),
+        itemBuilder: (_, i) {
+          final opt = options[i];
+          final active = opt == selected;
+          final accent = opt == 'Kenya'
+              ? AppTheme.brand
+              : opt == 'Ethiopia'
+                  ? const Color(0xFFFFD15C)
+                  : opt == 'Uganda'
+                      ? const Color(0xFF2BB673)
+                      : AppTheme.brand;
+          final countryFlag = switch (opt) {
+            'Kenya' => '🇰🇪 ',
+            'Ethiopia' => '🇪🇹 ',
+            'Uganda' => '🇺🇬 ',
+            _ => '',
+          };
+          return FilterChip(
+            label: Text('$countryFlag$opt'),
+            selected: active,
+            onSelected: (_) => onSelected(opt),
+            backgroundColor: cs.surface,
+            selectedColor: accent.withValues(alpha: 0.18),
+            checkmarkColor: accent,
+            labelStyle: text.labelMedium!.copyWith(
+              color: active ? accent : cs.onSurface.withValues(alpha: 0.7),
+              fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+            ),
+            side: active ? BorderSide(color: accent) : null,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.rFull)),
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.s8),
+          );
+        },
       ),
     );
   }

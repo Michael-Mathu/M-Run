@@ -7,6 +7,7 @@ import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
 import 'package:mwendo_app/features/learn/data/courses.dart';
+import 'package:mwendo_app/features/learn/data/legend_of_day.dart';
 import 'package:mwendo_app/data/models/run_record.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
 import 'package:mwendo_app/widgets/section_title.dart';
@@ -50,6 +51,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     const SizedBox(height: AppTheme.s16),
                     _FirstRunHint(onTap: () => context.go('/run'), locale: locale),
                   ],
+                  const SizedBox(height: AppTheme.s16),
+                  const LegendOfDayCard(),
                   const SizedBox(height: AppTheme.s28),
                 ]),
               ),

@@ -132,18 +132,35 @@
 |---|---|---|
 | Legends grid | [legends_page.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/learn/legends_page.dart) | ✅ |
 | Legend detail | [legend_detail_page.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/learn/legend_detail_page.dart) | ✅ |
-| Legend data | [legends.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/learn/data/legends.dart) | ✅ 20 legends seeded |
-| Beat the Legends | [beat_legends_page.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/beat/beat_legends_page.dart) | ⚠️ UI-only |
-| Ghost pace data | [beat_legends.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/learn/data/beat_legends.dart) | ✅ Split data defined |
+| Legend data | [legends.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/learn/data/legends.dart) | ✅ 30 legends seeded |
+| Legend of the Day/Week | [legend_of_day.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/learn/data/legend_of_day.dart) | ✅ |
+| Beat the Legends | [beat_legends_page.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/beat/beat_legends_page.dart) | ⚠️ UI-only (tiers added) |
+| Ghost pace data | [beat_legends.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/learn/data/beat_legends.dart) | ✅ 12 paces + tier system |
 
 **What works:**
 - Horizontal legend picker carousel with emoji avatars and accent borders.
+- Search box plus filter chip rows: Country (Kenya / Ethiopia / Uganda), Discipline, and Era
+  (1960s–70s → 2020s+); list filters by text AND active chips.
+- Legend detail page with personal-bests grid, career timeline, records, Training Philosophy
+  (with a link chip to the related education course), Rivalries chips, Notable Races cards,
+  categorized quotes (Training / Racing / Life / Legacy), a Fun Fact card, and a Related Legends
+  carousel.
+- **How You Compare** — reads the user's logged runs from `activitiesProvider` and matches best
+  times per distance (5K / 10K / half / marathon) against the legend's personal bests, showing
+  the gap % and a progress bar.
+- **Legend of the Day / Week** — deterministic providers (by day / week of year) drive a card on
+  the home dashboard with a fun fact and a "Read more" link.
 - Ghost header card with gradient, name, distance, target time, avg pace.
 - Per-segment splits chart via `fl_chart`.
+- **Tier selector** (Bronze 125% / Silver 110% / Gold 102% / G.O.A.T. 100% of record time); the
+  header, splits chart, description and race target all rescale with the selected tier.
 - "Race this ghost" button navigates to `/run`.
 
 **Functional issues:**
-- ⚠️ **Ghost racing is entirely cosmetic** — pressing "Race this ghost" navigates to the standard run page. There is no ghost marker on the map, no real-time pace comparison, no win/lose logic. The ghost splits data exists but is never consumed during an actual run.
+- ⚠️ **Ghost racing is still cosmetic** — pressing "Race this ghost" navigates to the standard run
+  page. There is no ghost marker on the map, no real-time pace comparison, and no win/lose logic.
+  The ghost splits and tier data exist but are not consumed during an actual run. This remains the
+  single biggest gap in Pillar 4.
 
 ---
 
@@ -320,8 +337,8 @@
 | Activity History | ✅ | ❌ fakes | ✅ | ❌ no DB | 35% |
 | Challenges + XP | ✅ | ✅ | n/a | ✅ SharedPrefs | 85% |
 | Learn Academy | ✅ | ✅ | n/a | ✅ SharedPrefs | 80% |
-| Legends | ✅ | ✅ | n/a | ✅ static | 90% |
-| Beat the Legends | ✅ | ❌ ghost logic | n/a | ✅ split data | 40% |
+| Legends | ✅ | ✅ | n/a | ✅ static | 95% |
+| Beat the Legends | ✅ | ❌ ghost logic | n/a | ✅ 12 paces + tiers | 60% |
 | Safety/SOS | ⚠️ | ❌ disconnected | n/a | ❌ no contacts | 15% |
 | Leaderboard | ✅ | ❌ fake data | ✅ Redis | ❌ no API call | 35% |
 | Auth | ❌ no UI | ❌ | ✅ bcrypt/JWT | ❌ no client | 25% |

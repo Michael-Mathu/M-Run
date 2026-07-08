@@ -19,12 +19,15 @@ class BeatLegendsPage extends ConsumerStatefulWidget {
 
 class _BeatLegendsPageState extends ConsumerState<BeatLegendsPage> {
   late GhostPace _selected;
+  DifficultyTier _tier = DifficultyTier.goat;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.id != null ? ghostPaceForId(widget.id!) : ghostPaces.first;
   }
+
+  GhostPace get _active => _selected.forTier(_tier);
 
   @override
   Widget build(BuildContext context) {
@@ -73,15 +76,17 @@ class _BeatLegendsPageState extends ConsumerState<BeatLegendsPage> {
                     },
                   ),
                 ),
-                const SizedBox(height: AppTheme.s20),
-              ]),
+                  const SizedBox(height: AppTheme.s16),
+                  _TierSelector(tier: _tier, onChanged: (t) => setState(() => _tier = t)),
+                  const SizedBox(height: AppTheme.s20),
+                ]),
+              ),
             ),
-          ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: AppTheme.s24),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                _GhostHeader(g: _selected),
+                _GhostHeader(g: _active),
                 const SizedBox(height: AppTheme.s16),
                 Container(
                   padding: const EdgeInsets.all(AppTheme.s16),
@@ -96,18 +101,18 @@ class _BeatLegendsPageState extends ConsumerState<BeatLegendsPage> {
                       Text(L10n.tr('seconds_per_km', locale),
                           style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
                       const SizedBox(height: AppTheme.s12),
-                      SizedBox(height: 160, child: _SplitsChart(g: _selected)),
+                      SizedBox(height: 160, child: _SplitsChart(g: _active)),
                     ],
                   ),
                 ),
                 const SizedBox(height: AppTheme.s16),
-                Text(_selected.description, style: text.bodyLarge!.copyWith(height: 1.6)),
+                Text(_active.description, style: text.bodyLarge!.copyWith(height: 1.6)),
                 const SizedBox(height: AppTheme.s20),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: () {
-                      ref.read(ghostTargetProvider.notifier).set(_selected);
+                      ref.read(ghostTargetProvider.notifier).set(_active);
                       context.go('/run');
                     },
                     icon: const Icon(Icons.play_arrow_rounded),
@@ -117,7 +122,7 @@ class _BeatLegendsPageState extends ConsumerState<BeatLegendsPage> {
                 ),
                 const SizedBox(height: AppTheme.s12),
                 Text(
-                  '${L10n.tr('during_a_run', locale)}${formatDuration(_selected.totalSeconds)}.',
+                  '${L10n.tr('during_a_run', locale)}${formatDuration(_active.totalSeconds)}.',
                   style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
                   textAlign: TextAlign.center,
                 ),
@@ -167,6 +172,56 @@ class _GhostHeader extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TierSelector extends StatelessWidget {
+  final DifficultyTier tier;
+  final ValueChanged<DifficultyTier> onChanged;
+  const _TierSelector({required this.tier, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.s4, vertical: AppTheme.s4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppTheme.r12),
+      ),
+      child: Row(
+        children: [
+          for (final t in DifficultyTier.values) ...[
+            if (t != DifficultyTier.values.first)
+              const SizedBox(width: AppTheme.s4),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => onChanged(t),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: AppTheme.s10),
+                  decoration: BoxDecoration(
+                    color: t == tier ? t.color.withValues(alpha: 0.22) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppTheme.r8),
+                    border: t == tier ? Border.all(color: t.color) : null,
+                  ),
+                  child: Column(
+                    children: [
+                      Text(t.badge, style: const TextStyle(fontSize: 18)),
+                      const SizedBox(height: AppTheme.s2),
+                      Text(t.label,
+                          style: text.labelSmall!.copyWith(
+                            color: t == tier ? t.color : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                            fontWeight: t == tier ? FontWeight.w700 : FontWeight.w600,
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

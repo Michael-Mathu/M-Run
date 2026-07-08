@@ -181,13 +181,19 @@ A complete, self-paced academy blending sports science with East Africa's unpara
 
 ### Pillar 3 — East African Legends
 
-A growing, curated library of interactive profiles. Each legend's page contains:
+A growing, curated library of interactive profiles (30 seeded across Kenya, Ethiopia, Uganda and
+beyond). Each legend's page contains:
 
-- Biography, career timeline, personal records
-- Major championships and memorable races
-- Training philosophy and quotes
-- Image galleries and (where rights allow) video highlights
+- Biography, career timeline, and a personal-bests grid
+- Major championships and memorable races (notable-races cards)
+- Training philosophy, with a link to the related education course
+- Rivalries (tappable chips) and related legends (cross-linked carousel)
+- Categorized quotes (Training / Racing / Life / Legacy) and a fun-fact card
 - "Challenge Me" button → suggests a Beat the Legends challenge
+
+The legends list is searchable and filterable by country, discipline, and era. A "Legend of the
+Day / Week" card surfaces a rotating legend (and a fun fact) on the home screen, and a "How You
+Compare" panel matches the user's logged PBs against the legend's records.
 
 Users can "follow" a legend; community contributors may submit new legends for review.
 
@@ -226,8 +232,10 @@ Users can "follow" a legend; community contributors may submit new legends for r
 
 - Ghost runner on the map during a run (e.g., Kipchoge's marathon splits, Faith Kipyegon's 1500m)
 - Real-time feedback: "You're 10 metres ahead of 2003 Bekele at this point"
-- Progressive tiers; unlock harder legends as you improve
-- Rewards: exclusive badges, medals, and titles
+- Difficulty tiers so any runner can take on a legend: **Bronze** (125% of record time),
+  **Silver** (110%), **Gold** (102%), and **G.O.A.T.** (the actual world record, 100%). Each
+  ghost pace ships with all four tiers; the splits, header, and race target rescale live.
+- Rewards: exclusive badges, medals, and titles per tier beaten
 - Maps directly to **Octalysis Core Drive 1: Epic Meaning and Calling** (from Content Research)
 
 ---

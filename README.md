@@ -54,8 +54,18 @@ leaderboards.
 
 ### Learn & celebrate
 - **Running education** — an in-app academy covering technique, training science, and health.
-- **East African legends** — interactive history, records, and stories of the sport's greats.
-- **Beat the Legends** — ghost-runner challenges racing against legendary performances.
+- **East African legends** — 30 interactive profiles (Kenya, Ethiopia, Uganda & more) with
+  biographies, career timelines, personal bests, training philosophy, rivalries, notable races,
+  categorized quotes, fun facts, and cross-linked related legends. Filter by country, discipline,
+  and era; tap a rival or related legend to jump straight to their profile.
+- **How You Compare** — on each legend's page, Mwendo matches your logged PBs (5K, 10K, half,
+  marathon) against the legend's records and shows the gap with a progress bar. No runs yet? A
+  prompt gets you out the door.
+- **Legend of the Day / Week** — a rotating card on the home screen surfaces a new legend (and a
+  fun fact) every day, with one tap into their full story.
+- **Beat the Legends** — ghost-runner challenges racing against legendary performances, now with a
+  Bronze / Silver / Gold / G.O.A.T. difficulty tier selector (125% → 100% of the record time) so
+  runners of any level can take on a legend.
 - **Challenges & gamification** — XP, levels, badges, streaks, and leaderboards to keep you
   coming back.
 

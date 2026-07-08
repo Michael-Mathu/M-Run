@@ -44,59 +44,6 @@
 
 ---
 
-## Implementation Status (live)
-
-> **Last updated:** 2026-07-08. This section tracks work actually landed against the
-> plan below. Items are marked **[DONE]**, **[PARTIAL]**, or **[TODO]**.
-
-### Phase C — Native background execution
-
-- **C1 — Android ForegroundService + notification — [DONE]**
-  - New `MwendoTrackingService` (Kotlin) owns the `FusedLocationProviderClient`
-    subscription, so a run keeps recording after the app is backgrounded or the
-    screen is locked.
-  - Plugin (`MwendoGpsEnginePlugin`) now `startForegroundService` + binds to the
-    service, forwards location updates through the `EventChannel`, and
-    pause/resume/stop via the bound `Binder`. The service is torn down only on an
-    explicit `stop()`, surviving transient Flutter engine detaches.
-  - Persistent low-importance notification via `ServiceCompat.startForeground`
-    with `FOREGROUND_SERVICE_TYPE_LOCATION` (API 29+). Notification icon added.
-  - Manifests updated: service declared `foregroundServiceType="location"` in the
-    plugin; `FOREGROUND_SERVICE_LOCATION` + `POST_NOTIFICATIONS` added to the app.
-  - `androidx.core:core` added as a plugin dependency.
-- **C2 — iOS background location modes + CLLocationManager — [DONE]**
-  - `CLLocationManager` now sets `pausesLocationUpdatesAutomatically = false` and
-    `activityType = .fitness` alongside the existing `allowsBackgroundLocationUpdates`.
-  - `UIBackgroundModes → location` added to the app `Info.plist`.
-
-### Phase D — Offline maps
-
-- **D1 — MBTiles/PMTiles bundle + custom TileProvider + local style — [DONE]**
-  - New `app/lib/data/maps/offline_map_provider.dart`:
-    - `MbTilesBundle`: opens an MBTiles SQLite archive via `sqlite3`, serves tiles
-      with the TMS→XYZ y-flip.
-    - `PmTilesBundle`: full PMTiles v3 reader (127-byte header, Hilbert `zxyToTileId`,
-      root/leaf directory decoding with LEB128 varints, run-length + RLE offsets,
-      gzip decompression of directories/tiles). None/gzip codecs supported.
-    - `OfflineTileServer`: a loopback `HttpServer` acting as the custom
-      `TileProvider`, emiting a `/{z}/{x}/{y}` raster template.
-    - `OfflineMapController` + Riverpod `offlineMapProvider` auto-discover a bundle
-      in `<docs>/offline_maps/*.mbtiles|*.pmtiles`, start the server, and expose a
-      local MapLibre style JSON.
-  - `RouteMap` and the live-dashboard `_MapView` now prefer the offline style and
-    fall back to the online Carto style when no bundle is present.
-  - `sqlite3` added to `app/pubspec.yaml`.
-
-### Verification
-
-- `flutter analyze` is clean for `app` and `packages/mwendo_gps_engine`.
-- Plugin unit tests pass (`flutter test test/`).
-- **[TODO]** Native Android/iOS builds were not compile-checked in this environment
-  (no SDK build run); Kotlin/Swift changes are written against the existing APIs but
-  should be verified with `flutter build apk` / `flutter build ios` on a real host.
-
----
-
 ## Phase 1 — Core Activity Tracker (Months 1–4)
 
 ### Month 1: Foundation (Weeks 1–4)
@@ -332,16 +279,6 @@ abstract class MwendoGpsEngine {
 4. Same state machine, watchdog, big-jump filter, Kalman filter logic
 5. Crash recovery via the same SQLite path
 
-> **Status (2026-07-08):** Background execution is implemented — **Android**
-> (C1) foreground service + notification done, **iOS** (C2) `pausesLocationUpdatesAutomatically = false`,
-> `activityType = .fitness`, and `UIBackgroundModes → location` done. **Not yet
-> implemented** from this spec: the adaptive hysteresis *state machine* (speed-based
-> asymmetric upgrade/downgrade — currently only a simple profile-based interval of
-> 5s/20s/30s), the GPS *watchdog* forced-pull, the *big-jump* multipath filter, the
-> real-time *Kalman* filter, and *crash recovery written to SQLite drift* inside the
-> plugin (recovery currently lives in the Dart `tracking_controller` as a JSON
-> snapshot). See Phase F for the tracking-quality roadmap.
-
 **Testing strategy:**
 - Unit tests for the state machine (pure Dart/Kotlin/Swift — no GPS hardware needed)
 - Integration tests with mock location providers on both platforms
@@ -366,19 +303,6 @@ abstract class MwendoGpsEngine {
 **PMTiles (online streaming):**
 - For users with connectivity, use PMTiles on MinIO with HTTP Range Requests — no tile server needed
 - Seamless fallback: try PMTiles online → fall back to local MBTiles cache
-
-> **Status (2026-07-08):** Local offline rendering is implemented (D1).
-> **Done:** `MbTilesBundle` (sqlite3 + TMS→XYZ flip), full `PmTilesBundle` v3 reader
-> (header, Hilbert TileID, root/leaf directory LEB128 decode, gzip decompression),
-> and a loopback `OfflineTileServer` acting as the custom `TileProvider`. A local
-> MapLibre raster style is generated and wired into `RouteMap` + live-dashboard
-> `_MapView` with online fallback. **Not yet implemented:** bundling a default
-> Nairobi/Rift Valley MBTiles extract as an app asset (~50 MB) — the controller
-> currently auto-discovers a bundle dropped into `<docs>/offline_maps/`; the in-app
-> "Download Region" UI; and the running-tuned JSON style (high-contrast /
-> elevation shading) — the current style is a plain raster layer. PMTiles brotli/zstd
-> codecs are unsupported (None/gzip only). Online PMTiles streaming via MinIO
-> Range Requests is not wired.
 
 ---
 

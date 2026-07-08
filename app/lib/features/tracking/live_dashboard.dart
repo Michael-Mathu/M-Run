@@ -77,7 +77,9 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                 flex: 58,
                 child: Stack(
                   children: [
-                    _MapView(points: m.trackPoints, styleString: style),
+                    RepaintBoundary(
+                      child: _MapView(points: m.trackPoints, styleString: style),
+                    ),
                     Positioned(
                       top: MediaQuery.of(context).padding.top + AppTheme.s12,
                       left: AppTheme.s16,
@@ -222,17 +224,19 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
   Future<void> _requestAndStart(WidgetRef ref, BuildContext context) async {
     Haptics.medium();
     final status = await Permission.locationWhenInUse.request();
+    if (status.isPermanentlyDenied) {
+      if (context.mounted) _showGpsOverlay(context);
+      return;
+    }
     if (!status.isGranted) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Location permission is required to track runs.'),
-            action: status.isPermanentlyDenied
-                ? SnackBarAction(
-                    label: 'Settings',
-                    onPressed: () => openAppSettings(),
-                  )
-                : null,
+            action: SnackBarAction(
+              label: L10n.tr('open_settings', ref.read(localeProvider)),
+              onPressed: () => openAppSettings(),
+            ),
           ),
         );
       }
@@ -266,6 +270,61 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
       );
     }
     ref.read(trackingModelProvider.notifier).start();
+  }
+
+  /// Full-screen explanation shown when location permission is permanently
+  /// denied (Strava-style) so the user understands why it's needed and can
+  /// jump straight to system Settings.
+  void _showGpsOverlay(BuildContext context) {
+    final locale = ref.read(localeProvider);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dlg) => Dialog(
+        backgroundColor: AppTheme.darkElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.r24)),
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.s24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppTheme.brand.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.location_on_rounded, color: AppTheme.brand, size: 36),
+              ),
+              const SizedBox(height: AppTheme.s16),
+              Text(L10n.tr('gps_required_title', locale),
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: AppTheme.s8),
+              Text(L10n.tr('gps_required_body', locale),
+                  style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+              const SizedBox(height: AppTheme.s20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.of(dlg).pop();
+                    openAppSettings();
+                  },
+                  child: Text(L10n.tr('open_settings', locale)),
+                ),
+              ),
+              const SizedBox(height: AppTheme.s4),
+              TextButton(
+                onPressed: () => Navigator.of(dlg).pop(),
+                child: Text(L10n.tr('cancel', locale)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _onStop(WidgetRef ref) async {
@@ -335,7 +394,7 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
   }
 }
 
-class _ControlCluster extends StatelessWidget {
+class _ControlCluster extends ConsumerWidget {
   final AppEngineState state;
   final VoidCallback onStart;
   final VoidCallback onPause;
@@ -350,42 +409,55 @@ class _ControlCluster extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final recording = state == AppEngineState.recording;
     final idle = state == AppEngineState.idle;
+    final mainLabel = idle
+        ? L10n.tr('start_run_control', ref.watch(localeProvider))
+        : (recording
+            ? L10n.tr('pause_run', ref.watch(localeProvider))
+            : L10n.tr('resume_run', ref.watch(localeProvider)));
     return Row(
       children: [
         if (recording)
           Padding(
             padding: const EdgeInsets.only(right: AppTheme.s16),
-            child: FloatingActionButton(
-              heroTag: 'stop',
-              backgroundColor: AppTheme.sos,
-              onPressed: onStop,
-              child: const Icon(Icons.stop_rounded, color: Colors.white),
+            child: Semantics(
+              button: true,
+              label: L10n.tr('stop_run', ref.watch(localeProvider)),
+              child: FloatingActionButton(
+                heroTag: 'stop',
+                backgroundColor: AppTheme.sos,
+                onPressed: onStop,
+                child: const Icon(Icons.stop_rounded, color: Colors.white),
+              ),
             ),
           ),
-        FloatingActionButton.large(
-          heroTag: 'main',
-          backgroundColor: idle
-              ? AppTheme.brand
-              : (recording ? AppTheme.paused : AppTheme.brand),
-          elevation: 8,
-          onPressed: () {
-            if (idle) {
-              onStart();
-            } else if (recording) {
-              onPause();
-            } else {
-              onResume();
-            }
-          },
-          child: Icon(
-            idle
-                ? Icons.play_arrow_rounded
-                : (recording ? Icons.pause_rounded : Icons.play_arrow_rounded),
-            size: 40,
-            color: Colors.white,
+        Semantics(
+          button: true,
+          label: mainLabel,
+          child: FloatingActionButton.large(
+            heroTag: 'main',
+            backgroundColor: idle
+                ? AppTheme.brand
+                : (recording ? AppTheme.paused : AppTheme.brand),
+            elevation: 8,
+            onPressed: () {
+              if (idle) {
+                onStart();
+              } else if (recording) {
+                onPause();
+              } else {
+                onResume();
+              }
+            },
+            child: Icon(
+              idle
+                  ? Icons.play_arrow_rounded
+                  : (recording ? Icons.pause_rounded : Icons.play_arrow_rounded),
+              size: 40,
+              color: Colors.white,
+            ),
           ),
         ),
       ],
@@ -467,14 +539,14 @@ class _GhostChip extends ConsumerWidget {
         children: [
           const Icon(Icons.blur_on_rounded, color: Colors.white, size: 14),
           const SizedBox(width: AppTheme.s6),
-          Text(
+           Text(
             '${L10n.tr('ghost_label', locale)} ${formatPace(ghost.avgPaceMinPerKm)} · you ${userAvg > 0 ? formatPace(userAvg) : "--:--"}',
-            style: Theme.of(context).textTheme.labelSmall!.copyWith(color: Colors.white),
+            style: Theme.of(context).textTheme.labelSmall!.copyWith(color: Colors.white, fontFeatures: const [FontFeature.tabularFigures()]),
           ),
           const SizedBox(width: AppTheme.s6),
           Text(
             userAvg > 0 ? '${ahead ? "" : "+"}${formatPace(delta.abs())}' : '',
-            style: Theme.of(context).textTheme.labelSmall!.copyWith(color: color),
+            style: Theme.of(context).textTheme.labelSmall!.copyWith(color: color, fontFeatures: const [FontFeature.tabularFigures()]),
           ),
         ],
       ),
@@ -487,15 +559,20 @@ class _SosButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Material(
-      color: Colors.black.withValues(alpha: 0.45),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: () => _confirmSos(context, ref),
-        child: const Padding(
-          padding: EdgeInsets.all(AppTheme.s12),
-          child: Icon(Icons.shield_outlined, color: Colors.white, size: 22),
+    final locale = ref.watch(localeProvider);
+    return Semantics(
+      button: true,
+      label: L10n.tr('sos_button', locale),
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.45),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => _confirmSos(context, ref),
+          child: const Padding(
+            padding: EdgeInsets.all(14),
+            child: Icon(Icons.shield_outlined, color: Colors.white, size: 22),
+          ),
         ),
       ),
     );
@@ -586,22 +663,26 @@ class _MapToggleButton extends ConsumerWidget {
 
     if (!offlineAvailable) return const SizedBox.shrink();
 
-    return Material(
-      color: Colors.black.withValues(alpha: 0.45),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: () {
-          ref.read(mapSourceProvider.notifier).toggle();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.s12),
-          child: Icon(
-            source == MapSource.offline
-                ? Icons.wifi_off_rounded
-                : Icons.wifi_rounded,
-            color: Colors.white,
-            size: 22,
+    return Semantics(
+      button: true,
+      label: L10n.tr('map_toggle', ref.watch(localeProvider)),
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.45),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () {
+            ref.read(mapSourceProvider.notifier).toggle();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Icon(
+              source == MapSource.offline
+                  ? Icons.wifi_off_rounded
+                  : Icons.wifi_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
         ),
       ),

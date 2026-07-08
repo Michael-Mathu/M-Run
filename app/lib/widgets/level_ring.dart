@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 
-/// Circular level indicator with the level number in the middle.
+/// Circular level indicator with the level number in the middle and a brand
+/// gradient progress arc.
 class LevelRing extends StatelessWidget {
   final int level;
   final double progress; // 0..1
@@ -25,11 +27,18 @@ class LevelRing extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          CircularProgressIndicator(
-            value: progress.clamp(0, 1),
-            strokeWidth: 5,
-            backgroundColor: Colors.white.withValues(alpha: 0.15),
-            valueColor: AlwaysStoppedAnimation(color),
+          ShaderMask(
+            shaderCallback: (rect) => SweepGradient(
+              colors: [AppTheme.brand, AppTheme.brandSoft, AppTheme.brand],
+              startAngle: -math.pi / 2,
+              endAngle: 3 * math.pi / 2,
+            ).createShader(rect),
+            child: CircularProgressIndicator(
+              value: progress.clamp(0, 1),
+              strokeWidth: 5,
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              valueColor: const AlwaysStoppedAnimation(Colors.white),
+            ),
           ),
           Column(
             mainAxisSize: MainAxisSize.min,

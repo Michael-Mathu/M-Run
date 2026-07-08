@@ -5,6 +5,7 @@ import 'package:mwendo_app/core/gamification/gamification_provider.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
+import 'package:mwendo_app/core/utils/haptics.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
 import 'package:mwendo_app/features/learn/data/courses.dart';
 import 'package:mwendo_app/features/learn/data/legend_of_day.dart';
@@ -21,6 +22,8 @@ class DashboardPage extends ConsumerStatefulWidget {
 }
 
 class _DashboardPageState extends ConsumerState<DashboardPage> {
+  bool _corruptionShown = false;
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -28,6 +31,25 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final g = ref.watch(gamificationProvider);
     final locale = ref.watch(localeProvider);
     final recent = ref.watch(activitiesProvider);
+
+    final corrupted = ref.watch(gamificationCorruptedProvider);
+    if (corrupted && !_corruptionShown) {
+      _corruptionShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(L10n.tr('progress_reset', locale)),
+              action: SnackBarAction(
+                label: L10n.tr('ok', locale),
+                onPressed: () {},
+              ),
+            ),
+          );
+          ref.read(gamificationCorruptedProvider.notifier).clear();
+        }
+      });
+    }
 
     final active = ChallengeEvaluator.allChallenges
         .where((c) => !g.completedChallenges.contains(c.slug))
@@ -99,9 +121,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     loading: () => const Column(
                       children: [SkeletonCard(height: 88), SizedBox(height: AppTheme.s12), SkeletonCard(height: 88)],
                     ),
-                    error: (_, _) => _EmptyActivity(text: text, cs: cs, locale: locale),
+                    error: (_, _) => _EmptyActivity(
+                        text: text, cs: cs, locale: locale, onWalkRun: () => context.go('/run'), onCourse: () => context.go('/learn/course/how-to-start-running')),
                     data: (runs) => runs.isEmpty
-                        ? _EmptyActivity(text: text, cs: cs, locale: locale)
+                        ? _EmptyActivity(
+                            text: text, cs: cs, locale: locale, onWalkRun: () => context.go('/run'), onCourse: () => context.go('/learn/course/how-to-start-running'))
                         : Column(
                             children: [
                               for (final r in runs.take(3))
@@ -153,28 +177,34 @@ class _TopBar extends StatelessWidget {
           ),
         ),
         if (g.streakDays > 0)
-          Container(
-            margin: const EdgeInsets.only(right: AppTheme.s8),
+          Semantics(
+            label: '${L10n.tr('streak', locale)} ${g.streakDays}',
+            child: Container(
+              margin: const EdgeInsets.only(right: AppTheme.s8),
+              padding: const EdgeInsets.symmetric(horizontal: AppTheme.s10, vertical: AppTheme.s4),
+              decoration: BoxDecoration(
+                color: AppTheme.tierGold.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(AppTheme.rFull),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.local_fire_department_rounded, color: AppTheme.tierGold, size: 16),
+                  const SizedBox(width: AppTheme.s4),
+                  Text('${g.streakDays}', style: text.labelMedium!.copyWith(color: AppTheme.tierGold)),
+                ],
+              ),
+            ),
+          ),
+        Semantics(
+          label: '${L10n.tr('level', locale)} ${g.level}',
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: AppTheme.s10, vertical: AppTheme.s4),
             decoration: BoxDecoration(
-              color: AppTheme.tierGold.withValues(alpha: 0.16),
+              color: AppTheme.brand.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(AppTheme.rFull),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.local_fire_department_rounded, color: AppTheme.tierGold, size: 16),
-                const SizedBox(width: AppTheme.s4),
-                Text('${g.streakDays}', style: text.labelMedium!.copyWith(color: AppTheme.tierGold)),
-              ],
-            ),
+            child: Text('LV ${g.level}', style: text.labelMedium!.copyWith(color: AppTheme.brand)),
           ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppTheme.s10, vertical: AppTheme.s4),
-          decoration: BoxDecoration(
-            color: AppTheme.brand.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(AppTheme.rFull),
-          ),
-          child: Text('LV ${g.level}', style: text.labelMedium!.copyWith(color: AppTheme.brand)),
         ),
       ],
     );
@@ -245,7 +275,10 @@ class _StartRunButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final text = Theme.of(context).textTheme;
     return FilledButton.icon(
-      onPressed: () => context.go('/run'),
+      onPressed: () {
+        Haptics.light();
+        context.go('/run');
+      },
       icon: const Icon(Icons.play_arrow_rounded, size: 24),
       label: Text(L10n.tr('start_run', ref.watch(localeProvider))),
       style: FilledButton.styleFrom(
@@ -328,54 +361,65 @@ class _DashboardChallengeCard extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final ratio = ch.ratio(g);
-    return Material(
-      color: cs.surface,
-      borderRadius: BorderRadius.circular(AppTheme.r16),
+    final accent = tierColor(ch.tier);
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.surface, accent.withValues(alpha: 0.08)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppTheme.r16),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppTheme.r16),
-        onTap: onTap,
+        onTap: () {
+          Haptics.light();
+          onTap();
+        },
         child: Padding(
-          padding: const EdgeInsets.all(AppTheme.s16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: tierColor(ch.tier).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+            padding: const EdgeInsets.all(AppTheme.s16),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: tierColor(ch.tier).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(ch.icon, color: tierColor(ch.tier), size: 28),
                 ),
-                child: Icon(ch.icon, color: tierColor(ch.tier), size: 28),
-              ),
-              const SizedBox(width: AppTheme.s16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(ch.title, style: text.titleMedium),
-                    const SizedBox(height: AppTheme.s2),
-                    Text(ch.description, style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: AppTheme.s8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppTheme.rFull),
-                      child: LinearProgressIndicator(
-                        value: ratio,
-                        minHeight: 6,
-                        backgroundColor: cs.surfaceContainerHighest,
-                        valueColor: AlwaysStoppedAnimation(tierColor(ch.tier)),
+                const SizedBox(width: AppTheme.s16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ch.title, style: text.titleMedium),
+                      const SizedBox(height: AppTheme.s2),
+                      Text(ch.description, style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: AppTheme.s8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppTheme.rFull),
+                        child: LinearProgressIndicator(
+                          value: ratio,
+                          minHeight: 6,
+                          backgroundColor: cs.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation(tierColor(ch.tier)),
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppTheme.s12),
+                Column(
+                  children: [
+                    Text('+${ch.xp}', style: text.labelMedium!.copyWith(color: tierColor(ch.tier))),
+                    Text('XP', style: text.labelSmall),
                   ],
                 ),
-              ),
-              const SizedBox(width: AppTheme.s12),
-              Column(
-                children: [
-                  Text('+${ch.xp}', style: text.labelMedium!.copyWith(color: tierColor(ch.tier))),
-                  Text('XP', style: text.labelSmall),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -531,25 +575,151 @@ class _EmptyActivity extends StatelessWidget {
   final TextTheme text;
   final ColorScheme cs;
   final AppLocale locale;
-  const _EmptyActivity({required this.text, required this.cs, required this.locale});
+  final VoidCallback? onWalkRun;
+  final VoidCallback? onCourse;
+  const _EmptyActivity({
+    required this.text,
+    required this.cs,
+    required this.locale,
+    this.onWalkRun,
+    this.onCourse,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.s32),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(AppTheme.r16),
-        border: Border.all(color: cs.surfaceContainerHighest),
-      ),
-      child: Column(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(AppTheme.s32),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(AppTheme.r16),
+            border: Border.all(color: cs.surfaceContainerHighest),
+          ),
+          child: Column(
+            children: [
+              const _RunIllustration(),
+              const SizedBox(height: AppTheme.s12),
+              Text(L10n.tr('no_runs_yet', locale), style: text.titleMedium),
+              const SizedBox(height: AppTheme.s4),
+              Text(L10n.tr('routes_will_show', locale),
+                  style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55)), textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppTheme.s12),
+        Material(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(AppTheme.r16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.r16),
+            onTap: () {
+              Haptics.light();
+              onCourse?.call();
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.s16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppTheme.brand.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(AppTheme.r12),
+                    ),
+                    child: const Icon(Icons.school_rounded, color: AppTheme.brand, size: 24),
+                  ),
+                  const SizedBox(width: AppTheme.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(L10n.tr('learn_to_run', locale), style: text.titleMedium),
+                        const SizedBox(height: AppTheme.s2),
+                        Text(L10n.tr('learn_to_run_hint', locale),
+                            style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.6)), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppTheme.s12),
+        FilledButton.icon(
+          onPressed: () {
+            Haptics.light();
+            onWalkRun?.call();
+          },
+          icon: const Icon(Icons.directions_run_rounded, size: 22),
+          label: Text(L10n.tr('walk_run_now', locale)),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.brand,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: AppTheme.s16),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Lightweight animated illustration for empty states: a bouncing runner on a
+/// softly pulsing ring. Pure Flutter, no assets required.
+class _RunIllustration extends StatefulWidget {
+  const _RunIllustration();
+
+  @override
+  State<_RunIllustration> createState() => _RunIllustrationState();
+}
+
+class _RunIllustrationState extends State<_RunIllustration>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+  late final Animation<double> _bob =
+      Tween<double>(begin: -4, end: 4).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  late final Animation<double> _ring =
+      Tween<double>(begin: 0.55, end: 1.0).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 72,
+      width: 72,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Icon(Icons.route_rounded, size: 44, color: cs.onSurface.withValues(alpha: 0.25)),
-          const SizedBox(height: AppTheme.s12),
-          Text(L10n.tr('no_runs_yet', locale), style: text.titleMedium),
-          const SizedBox(height: AppTheme.s4),
-          Text(L10n.tr('routes_will_show', locale),
-              style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55)), textAlign: TextAlign.center),
+          AnimatedBuilder(
+            animation: _ring,
+            builder: (_, _) => Container(
+              width: 64 * _ring.value,
+              height: 64 * _ring.value,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.brand.withValues(alpha: 0.12 * (1 - _ring.value + 0.4)),
+              ),
+            ),
+          ),
+          AnimatedBuilder(
+            animation: _bob,
+            builder: (_, _) => Transform.translate(
+              offset: Offset(0, _bob.value),
+              child: const Text('🏃', style: TextStyle(fontSize: 36)),
+            ),
+          ),
         ],
       ),
     );

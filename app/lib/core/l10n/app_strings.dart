@@ -135,6 +135,41 @@ class L10n {
     'account': {'en': 'Account', 'sw': 'Akaunti'},
     'sign_out': {'en': 'Sign out', 'sw': 'Toka'},
     'submitted': {'en': 'Run synced to leaderboard', 'sw': 'Mbio imesawazishwa kwenye ubao'},
+
+    // ---- Polish pass ----
+    'level_up_subtitle': {'en': 'Level up! Keep the streak alive.', 'sw': 'Umekwea kiwango! Endelea msururu.'},
+    'walk_run_now': {'en': 'Take a walk-run now', 'sw': 'Fanya walk-run sasa'},
+    'learn_to_run': {'en': 'How to Start Running', 'sw': 'Jinsi ya Kuanza Kukimbia'},
+    'learn_to_run_hint': {
+      'en': 'New here? Learn the walk-run method and reach your first 5K.',
+      'sw': 'Mpya? Jifunze mbinu ya walk-run ufikie 5K yako ya kwanza.'
+    },
+    'import_gpx_action': {'en': 'Import a GPX', 'sw': 'Ingiza GPX'},
+    'try_search': {'en': "Try 'Kipchoge' or 'Ethiopia'", 'sw': "Jaribu 'Kipchoge' au 'Ethiopia'"},
+    'popular_legends': {'en': 'Popular', 'sw': 'Maarufu'},
+    'stats_week': {'en': 'Week', 'sw': 'Wiki'},
+    'stats_month': {'en': 'Month', 'sw': 'Mwezi'},
+    'your_legends': {'en': 'Your Legends', 'sw': 'Mashujaa Wako'},
+    'legend_raced': {'en': 'Raced', 'sw': 'Umeshindana'},
+    'legend_beaten': {'en': 'Beaten', 'sw': 'Umeshinda'},
+    'locked': {'en': 'Locked', 'sw': 'Imefuliwa'},
+    'gps_required_title': {'en': 'Location is required', 'sw': 'Eneo linahitajika'},
+    'gps_required_body': {
+      'en': 'Mwendo uses your location to map your route and measure distance. Without it, runs cannot be tracked.',
+      'sw': 'Mwendo hutumia eneo lako kuchora njia na kupima umbali. Bila hilo, mbio haziwezi kufuatiliwa.'
+    },
+    'progress_reset': {
+      'en': 'Your saved progress was corrupted and has been reset.',
+      'sw': 'Maendeleo yako yaliharibika na yamerudishwa.'
+    },
+    'sos_button': {'en': 'Emergency SOS', 'sw': 'SOS ya Dharura'},
+    'map_toggle': {'en': 'Toggle map source', 'sw': 'Badilisha chanzo cha ramani'},
+    'stop_run': {'en': 'Stop run', 'sw': 'Sita mbio'},
+    'pause_run': {'en': 'Pause run', 'sw': 'Sitisha mbio'},
+    'resume_run': {'en': 'Resume run', 'sw': 'Endelea mbio'},
+    'start_run_control': {'en': 'Start run', 'sw': 'Anza mbio'},
+    'open_settings': {'en': 'Open Settings', 'sw': 'Fungua Mipangilio'},
+    'skeleton_loading': {'en': 'Loading…', 'sw': 'Inapakia…'},
   };
 
   static String tr(String key, AppLocale locale) {

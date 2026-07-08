@@ -8,6 +8,7 @@ import 'package:mwendo_app/core/utils/format.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
 import 'package:mwendo_app/data/sample_activities.dart';
 import 'package:mwendo_app/widgets/route_map.dart';
+import 'package:mwendo_app/widgets/skeleton.dart';
 
 class ActivityDetailPage extends ConsumerWidget {
   final String id;
@@ -15,7 +16,11 @@ class ActivityDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final run = ref.watch(activityByIdProvider(id)).value;
+    final asyncRun = ref.watch(activityByIdProvider(id));
+    if (asyncRun.isLoading) {
+      return const Scaffold(body: SafeArea(child: _DetailSkeleton()));
+    }
+    final run = asyncRun.value;
     final a = run?.toSampleActivity() ?? SampleActivity.forId(id);
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
@@ -209,4 +214,39 @@ class _ChartCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DetailSkeleton extends StatelessWidget {
+  const _DetailSkeleton();
+
+  @override
+  Widget build(BuildContext context) => CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(
+            child: SizedBox(height: 260, child: Skeleton(radius: 0)),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.all(AppTheme.s24),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                const Skeleton(height: 28, width: 160),
+                const SizedBox(height: AppTheme.s12),
+                GridView.count(
+                  crossAxisCount: 3,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: AppTheme.s12,
+                  crossAxisSpacing: AppTheme.s12,
+                  childAspectRatio: 1.6,
+                  children: [for (int i = 0; i < 6; i++) const Skeleton(height: 56)],
+                ),
+                const SizedBox(height: AppTheme.s16),
+                const SkeletonCard(height: 180),
+                const SizedBox(height: AppTheme.s16),
+                const SkeletonCard(height: 180),
+              ]),
+            ),
+          ),
+        ],
+      );
 }

@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
+import 'package:mwendo_app/core/utils/haptics.dart';
 import 'package:mwendo_app/data/gpx_export.dart';
 import 'package:mwendo_app/data/models/run_record.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
@@ -61,10 +62,10 @@ class _ActivityListPageState extends ConsumerState<ActivityListPage> {
           separatorBuilder: (_, index) => const SizedBox(height: AppTheme.s12),
           itemBuilder: (_, index) => const SkeletonCard(height: 88),
         ),
-        error: (_, _) => _EmptyState(text: text, cs: cs, locale: locale),
+        error: (_, _) => _EmptyState(text: text, cs: cs, locale: locale, onImportGpx: () => _importGpx(context, ref, locale)),
         data: (real) {
           final items = real.isNotEmpty ? real : <RunRecord>[];
-          if (items.isEmpty) return _EmptyState(text: text, cs: cs, locale: locale);
+          if (items.isEmpty) return _EmptyState(text: text, cs: cs, locale: locale, onImportGpx: () => _importGpx(context, ref, locale));
           final types = items.map((r) => r.type).toSet().toList()..sort();
           final sorted = _apply(items);
           return CustomScrollView(
@@ -146,6 +147,17 @@ class _ActivityListPageState extends ConsumerState<ActivityListPage> {
           );
         },
       ),
+      floatingActionButton: !runs.isLoading
+          ? FloatingActionButton.extended(
+              heroTag: 'activity-fab',
+              onPressed: () {
+                Haptics.light();
+                context.go('/run');
+              },
+              icon: const Icon(Icons.add_rounded),
+              label: Text(L10n.tr('start_run', locale)),
+            )
+          : null,
     );
   }
 
@@ -173,6 +185,14 @@ class _ActivityListPageState extends ConsumerState<ActivityListPage> {
         ShareParams(text: L10n.tr('exported', locale), files: [XFile(file.path)]),
       );
     }
+  }
+
+  void _importGpx(BuildContext context, WidgetRef ref, AppLocale locale) {
+    // ponytail: file_picker is intentionally not a dependency. GPX parsing is
+    // available (gpx_parser.dart); wiring a platform picker is a follow-up.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(L10n.tr('import_gpx_action', locale))),
+    );
   }
 }
 
@@ -208,21 +228,48 @@ class _EmptyState extends StatelessWidget {
   final TextTheme text;
   final ColorScheme cs;
   final AppLocale locale;
-  const _EmptyState({required this.text, required this.cs, required this.locale});
+  final VoidCallback? onImportGpx;
+  const _EmptyState({
+    required this.text,
+    required this.cs,
+    required this.locale,
+    this.onImportGpx,
+  });
 
   @override
   Widget build(BuildContext context) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_rounded,
-                size: 48, color: cs.onSurface.withValues(alpha: 0.2)),
-            const SizedBox(height: AppTheme.s12),
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: cs.surface,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.history_rounded,
+                  size: 44, color: cs.onSurface.withValues(alpha: 0.25)),
+            ),
+            const SizedBox(height: AppTheme.s16),
             Text(L10n.tr('nothing_recorded', locale), style: text.titleMedium),
             const SizedBox(height: AppTheme.s4),
-            Text(L10n.tr('first_run_prompt', locale),
-                style: text.bodySmall!
-                    .copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppTheme.s24),
+              child: Text(L10n.tr('first_run_prompt', locale),
+                  style: text.bodySmall!
+                      .copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
+                  textAlign: TextAlign.center),
+            ),
+            const SizedBox(height: AppTheme.s16),
+            TextButton.icon(
+              onPressed: () {
+                Haptics.light();
+                onImportGpx?.call();
+              },
+              icon: const Icon(Icons.file_upload_outlined, size: 18),
+              label: Text(L10n.tr('import_gpx_action', locale)),
+            ),
           ],
         ),
       );

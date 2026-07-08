@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,15 +8,35 @@ import 'package:mwendo_app/features/learn/data/beat_legends.dart';
 
 export 'gamification_state.dart';
 
+/// Set to true when the persisted save is detected as corrupt and reset. The
+/// UI watches this to surface a one-time notice to the user.
+class _CorruptionFlag extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void flag() => state = true;
+  void clear() => state = false;
+}
+
+final gamificationCorruptedProvider = NotifierProvider<_CorruptionFlag, bool>(_CorruptionFlag.new);
+
 /// Persistent gamification engine — XP, levels, streaks, badges and titles,
 /// saved locally (offline-first). Phase 2's motivation system.
 class Gamification extends Notifier<GamificationState> {
   static const _key = 'gamification_v1';
+  Timer? _autosaveTimer;
 
   @override
   GamificationState build() {
     _load();
+    _startAutosave();
     return const GamificationState();
+  }
+
+  void _startAutosave() {
+    // ponytail: periodic autosave (every 2 min) so a crash between mutating
+    // state and the explicit _persist() can't lose more than a couple minutes.
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer.periodic(const Duration(minutes: 2), (_) => _persist());
   }
 
   void _load() {
@@ -25,7 +46,12 @@ class Gamification extends Notifier<GamificationState> {
         if (raw != null) {
           state = GamificationState.fromJson(jsonDecode(raw));
         }
-      } catch (_) {}
+      } catch (_) {
+        // Corrupt save — reset to a clean default instead of crashing.
+        state = const GamificationState();
+        ref.read(gamificationCorruptedProvider.notifier).flag();
+        prefs.remove(_key);
+      }
     });
   }
 

@@ -19,6 +19,29 @@ import 'package:mwendo_app/features/onboarding/onboarding_provider.dart';
 import 'package:mwendo_app/features/profile/profile_page.dart';
 import 'package:mwendo_app/features/tracking/live_dashboard.dart';
 import 'package:mwendo_app/features/tracking/tracking_controller.dart';
+import 'package:mwendo_app/core/utils/haptics.dart';
+
+/// Slide-up + fade page transition used across the app for a snappy,
+/// Strava/NRC-like feel: 6% upward slide, 200ms, easeOutCubic.
+CustomTransitionPage<void> _slidePage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 200),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final slide = Tween<Offset>(
+        begin: const Offset(0, 0.06),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+      final fade = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      return SlideTransition(
+        position: slide,
+        child: FadeTransition(opacity: fade, child: child),
+      );
+    },
+  );
+}
 
 GoRouter makeRouter(Ref ref) => GoRouter(
       initialLocation: '/',
@@ -35,109 +58,183 @@ GoRouter makeRouter(Ref ref) => GoRouter(
           branches: [
             StatefulShellBranch(
               routes: [
-                GoRoute(path: '/', builder: (context, state) => const DashboardPage()),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(path: '/challenges',
-                    builder: (context, state) => const ChallengesLibraryPage()),
                 GoRoute(
-                  path: '/challenges/:slug',
-                  builder: (context, state) =>
-                      ChallengeDetailPage(slug: state.pathParameters['slug']!),
+                  path: '/',
+                  pageBuilder: (context, state) =>
+                      _slidePage(state, const DashboardPage()),
                 ),
               ],
             ),
             StatefulShellBranch(
               routes: [
-                GoRoute(path: '/run', builder: (context, state) => const LiveDashboard()),
+                GoRoute(
+                  path: '/challenges',
+                  pageBuilder: (context, state) =>
+                      _slidePage(state, const ChallengesLibraryPage()),
+                ),
+                GoRoute(
+                  path: '/challenges/:slug',
+                  pageBuilder: (context, state) => _slidePage(
+                    state,
+                    ChallengeDetailPage(slug: state.pathParameters['slug']!),
+                  ),
+                ),
               ],
             ),
             StatefulShellBranch(
               routes: [
-                GoRoute(path: '/learn', builder: (context, state) => const LearnPage()),
+                GoRoute(
+                  path: '/run',
+                  pageBuilder: (context, state) =>
+                      _slidePage(state, const LiveDashboard()),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/learn',
+                  pageBuilder: (context, state) =>
+                      _slidePage(state, const LearnPage()),
+                ),
                 GoRoute(
                   path: '/learn/course/:slug',
-                  builder: (context, state) =>
-                      CourseDetailPage(slug: state.pathParameters['slug']!),
+                  pageBuilder: (context, state) => _slidePage(
+                    state,
+                    CourseDetailPage(slug: state.pathParameters['slug']!),
+                  ),
                 ),
                 GoRoute(
                   path: '/learn/course/:slug/lesson/:index',
-                  builder: (context, state) => LessonPage(
-                    slug: state.pathParameters['slug']!,
-                    index: int.parse(state.pathParameters['index']!),
+                  pageBuilder: (context, state) => _slidePage(
+                    state,
+                    LessonPage(
+                      slug: state.pathParameters['slug']!,
+                      index: int.parse(state.pathParameters['index']!),
+                    ),
                   ),
                 ),
                 GoRoute(
                   path: '/learn/legends',
-                  builder: (context, state) => const LegendsPage(),
+                  pageBuilder: (context, state) =>
+                      _slidePage(state, const LegendsPage()),
                 ),
                 GoRoute(
                   path: '/learn/legends/:slug',
-                  builder: (context, state) =>
-                      LegendDetailPage(slug: state.pathParameters['slug']!),
+                  pageBuilder: (context, state) => _slidePage(
+                    state,
+                    LegendDetailPage(slug: state.pathParameters['slug']!),
+                  ),
                 ),
               ],
             ),
             StatefulShellBranch(
               routes: [
-                GoRoute(path: '/profile', builder: (context, state) => const ProfilePage()),
+                GoRoute(
+                  path: '/profile',
+                  pageBuilder: (context, state) =>
+                      _slidePage(state, const ProfilePage()),
+                ),
               ],
             ),
           ],
         ),
         GoRoute(
           path: '/beat',
-          builder: (context, state) => const BeatLegendsPage(),
+          pageBuilder: (context, state) =>
+              _slidePage(state, const BeatLegendsPage()),
         ),
         GoRoute(
           path: '/beat/:id',
-          builder: (context, state) => BeatLegendsPage(id: state.pathParameters['id']),
+          pageBuilder: (context, state) => _slidePage(
+            state,
+            BeatLegendsPage(id: state.pathParameters['id']),
+          ),
         ),
         GoRoute(
           path: '/activity',
-          builder: (context, state) => const ActivityListPage(),
+          pageBuilder: (context, state) =>
+              _slidePage(state, const ActivityListPage()),
         ),
         GoRoute(
           path: '/activity/:id',
-          builder: (context, state) =>
-              ActivityDetailPage(id: state.pathParameters['id']!),
+          pageBuilder: (context, state) => _slidePage(
+            state,
+            ActivityDetailPage(id: state.pathParameters['id']!),
+          ),
         ),
         GoRoute(
           path: '/onboarding',
-          builder: (context, state) => const OnboardingPage(),
+          pageBuilder: (context, state) =>
+              _slidePage(state, const OnboardingPage()),
         ),
         GoRoute(
           path: '/auth',
-          builder: (context, state) => const AuthPage(),
+          pageBuilder: (context, state) =>
+              _slidePage(state, const AuthPage()),
         ),
       ],
     );
 
 final appRouterProvider = Provider<GoRouter>((ref) => makeRouter(ref));
 
-class ScaffoldWithNavBar extends ConsumerWidget {
+class ScaffoldWithNavBar extends ConsumerStatefulWidget {
   final StatefulNavigationShell shell;
   const ScaffoldWithNavBar({super.key, required this.shell});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ScaffoldWithNavBar> createState() => _ScaffoldWithNavBarState();
+}
+
+class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
+  // Swipe-to-switch-tab: detect a horizontal fling on the shell body and move
+  // to the adjacent branch. Lightweight alternative to wrapping the shell in a
+  // PageView, which would fight StatefulShellRoute's internal navigators.
+  static const _branchCount = 5;
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    final v = details.primaryVelocity;
+    if (v == null || v.abs() < 300) return;
+    final i = widget.shell.currentIndex;
+    final next = v < 0 ? i + 1 : i - 1;
+    if (next >= 0 && next < _branchCount) widget.shell.goBranch(next);
+  }
+
+  Widget _destination({
+    required Widget icon,
+    required Widget selectedIcon,
+    required String label,
+  }) =>
+      NavigationDestination(
+        icon: Opacity(opacity: 0.6, child: icon),
+        selectedIcon: Transform.scale(scale: 1.15, child: selectedIcon),
+        label: label,
+      );
+
+  @override
+  Widget build(BuildContext context) {
     final locale = ref.watch(localeProvider);
     return Scaffold(
-      body: shell,
+      body: GestureDetector(
+        onHorizontalDragEnd: _onHorizontalDragEnd,
+        behavior: HitTestBehavior.translucent,
+        child: widget.shell,
+      ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: shell.currentIndex,
-        onDestinationSelected: shell.goBranch,
+        selectedIndex: widget.shell.currentIndex,
+        onDestinationSelected: (i) {
+          if (i != widget.shell.currentIndex) Haptics.selection();
+          widget.shell.goBranch(i);
+        },
         height: 72,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: [
-          NavigationDestination(
+          _destination(
             icon: const Icon(Icons.home_outlined),
             selectedIcon: const Icon(Icons.home_rounded),
             label: L10n.tr('home', locale),
           ),
-          NavigationDestination(
+          _destination(
             icon: const Icon(Icons.emoji_events_outlined),
             selectedIcon: const Icon(Icons.emoji_events_rounded),
             label: L10n.tr('challenges', locale),
@@ -147,12 +244,12 @@ class ScaffoldWithNavBar extends ConsumerWidget {
             selectedIcon: const _RunNavIcon(),
             label: L10n.tr('run', locale),
           ),
-          NavigationDestination(
+          _destination(
             icon: const Icon(Icons.school_outlined),
             selectedIcon: const Icon(Icons.school_rounded),
             label: L10n.tr('learn', locale),
           ),
-          NavigationDestination(
+          _destination(
             icon: const Icon(Icons.person_outline_rounded),
             selectedIcon: const Icon(Icons.person_rounded),
             label: L10n.tr('profile', locale),
@@ -163,43 +260,61 @@ class ScaffoldWithNavBar extends ConsumerWidget {
   }
 }
 
-class _RunNavIcon extends ConsumerWidget {
+/// Run tab icon. When not recording it emits a soft pulsing glow (attract
+/// mode); once recording the glow steadies into a solid red pulse.
+class _RunNavIcon extends ConsumerStatefulWidget {
   const _RunNavIcon();
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_RunNavIcon> createState() => _RunNavIconState();
+}
+
+class _RunNavIconState extends ConsumerState<_RunNavIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final recording =
         ref.watch(trackingModelProvider).state == AppEngineState.recording;
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF5A1F), Color(0xFFFF8A3D)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        shape: BoxShape.circle,
-        boxShadow: recording
-            ? const [
-                BoxShadow(
-                  color: Color(0xFFFF5A1F),
-                  blurRadius: 14,
-                  spreadRadius: 3,
-                ),
-              ]
-            : const [
-                BoxShadow(
-                    color: Color(0xFFFF5A1F),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                    offset: Offset(0, 2)),
-              ],
-      ),
-      child: Icon(
-        recording ? Icons.stop_rounded : Icons.play_arrow_rounded,
-        color: Colors.white,
-        size: 26,
-      ),
+    const base = Color(0xFFFF5A1F);
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final glow = recording ? 0.0 : (_pulse.value * 8 + 6);
+        return Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFF5A1F), Color(0xFFFF8A3D)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: base.withValues(alpha: recording ? 1.0 : 0.5),
+                blurRadius: recording ? 14 : glow,
+                spreadRadius: recording ? 3 : glow * 0.4,
+              ),
+            ],
+          ),
+          child: Icon(
+            recording ? Icons.stop_rounded : Icons.play_arrow_rounded,
+            color: Colors.white,
+            size: 26,
+          ),
+        );
+      },
     );
   }
 }

@@ -126,6 +126,16 @@ class AppTheme {
         textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
       ),
     ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: lightScaffold,
+      indicatorColor: brand.withValues(alpha: 0.16),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: lightElevated,
+      contentTextStyle: const TextStyle(color: Color(0xFF1A1A1C)),
+      actionTextColor: brand,
+    ),
+    dialogTheme: DialogThemeData(backgroundColor: lightCard),
     extensions: [AppExtensions.light],
   );
 
@@ -161,6 +171,16 @@ class AppTheme {
         textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
       ),
     ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: darkScaffold,
+      indicatorColor: brand.withValues(alpha: 0.18),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: darkElevated,
+      contentTextStyle: const TextStyle(color: Colors.white),
+      actionTextColor: brandSoft,
+    ),
+    dialogTheme: DialogThemeData(backgroundColor: darkElevated),
     extensions: [AppExtensions.dark],
   );
 }

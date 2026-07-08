@@ -306,5 +306,9 @@ List<GhostPace> get ghostPaces => [
       ),
     ];
 
-GhostPace ghostPaceForId(String id) =>
-    ghostPaces.firstWhere((g) => g.id == id, orElse: () => ghostPaces.first);
+Map<String, GhostPace>? _ghostById;
+
+GhostPace ghostPaceForId(String id) {
+  _ghostById ??= {for (final g in ghostPaces) g.id: g};
+  return _ghostById![id] ?? ghostPaces.first;
+}

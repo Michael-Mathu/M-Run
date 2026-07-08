@@ -338,5 +338,9 @@ const List<Course> courses = [
   ),
 ];
 
-Course courseForSlug(String slug) =>
-    courses.firstWhere((c) => c.slug == slug, orElse: () => courses.first);
+Map<String, Course>? _courseBySlug;
+
+Course courseForSlug(String slug) {
+  _courseBySlug ??= {for (final c in courses) c.slug: c};
+  return _courseBySlug![slug] ?? courses.first;
+}

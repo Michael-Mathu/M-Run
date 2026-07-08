@@ -1272,8 +1272,12 @@ const List<Legend> legends = [
   ),
 ];
 
-Legend legendForSlug(String slug) =>
-    legends.firstWhere((l) => l.slug == slug, orElse: () => legends.first);
+Map<String, Legend>? _legendBySlug;
+
+Legend legendForSlug(String slug) {
+  _legendBySlug ??= {for (final l in legends) l.slug: l};
+  return _legendBySlug![slug] ?? legends.first;
+}
 
 Color legendAccent(Legend l) => {
       'orange': const Color(0xFFFF5A1F),

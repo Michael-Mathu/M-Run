@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mwendo_app/core/gamification/gamification_provider.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
+import 'package:mwendo_app/core/utils/haptics.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
 import 'package:mwendo_app/widgets/level_ring.dart';
 
@@ -175,59 +176,72 @@ class _ChallengeCard extends StatelessWidget {
     final done = ch.isComplete(g);
     final color = tierColor(ch.tier);
 
-    return Material(
-      color: cs.surface,
-      borderRadius: BorderRadius.circular(AppTheme.r16),
-      child: InkWell(
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.surface, color.withValues(alpha: 0.08)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(AppTheme.r16),
-        onTap: () => context.push('/challenges/${ch.slug}'),
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.s16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.16),
-                  shape: BoxShape.circle,
+        boxShadow: done
+            ? [BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 16, spreadRadius: 1)]
+            : null,
+      ),
+      child: InkWell(
+          borderRadius: BorderRadius.circular(AppTheme.r16),
+          onTap: () {
+            Haptics.light();
+            context.push('/challenges/${ch.slug}');
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(AppTheme.s16),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(ch.icon, color: color, size: 28),
                 ),
-                child: Icon(ch.icon, color: color, size: 28),
-              ),
-              const SizedBox(width: AppTheme.s16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(ch.title, style: text.titleMedium),
-                    const SizedBox(height: AppTheme.s2),
-                    Text(ch.description,
-                        style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
-                        maxLines: 2, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: AppTheme.s8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppTheme.rFull),
-                      child: LinearProgressIndicator(
-                        value: ratio,
-                        minHeight: 6,
-                        backgroundColor: cs.surfaceContainerHighest,
-                        valueColor: AlwaysStoppedAnimation(color),
+                const SizedBox(width: AppTheme.s16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ch.title, style: text.titleMedium),
+                      const SizedBox(height: AppTheme.s2),
+                      Text(ch.description,
+                          style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: AppTheme.s8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppTheme.rFull),
+                        child: LinearProgressIndicator(
+                          value: ratio,
+                          minHeight: 6,
+                          backgroundColor: cs.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation(color),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppTheme.s6),
-                    Text(done ? L10n.tr('completed', locale) : ch.progressText(g),
-                        style: text.labelSmall!.copyWith(color: done ? color : cs.onSurface.withValues(alpha: 0.55))),
+                      const SizedBox(height: AppTheme.s6),
+                      Text(done ? L10n.tr('completed', locale) : ch.progressText(g),
+                          style: text.labelSmall!.copyWith(color: done ? color : cs.onSurface.withValues(alpha: 0.55))),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppTheme.s12),
+                Column(
+                  children: [
+                    Text('+${ch.xp}', style: text.labelMedium!.copyWith(color: color)),
+                    Text('XP', style: text.labelSmall),
                   ],
                 ),
-              ),
-              const SizedBox(width: AppTheme.s12),
-              Column(
-                children: [
-                  Text('+${ch.xp}', style: text.labelMedium!.copyWith(color: color)),
-                  Text('XP', style: text.labelSmall),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

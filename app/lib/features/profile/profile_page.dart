@@ -15,20 +15,57 @@ import 'package:mwendo_app/core/network/session_provider.dart';
 import 'package:mwendo_app/core/profile/profile_provider.dart';
 import 'package:mwendo_app/core/safety/safety_provider.dart';
 import 'package:mwendo_app/data/gpx_export.dart';
+import 'package:mwendo_app/data/models/run_record.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
+import 'package:mwendo_app/features/learn/data/beat_legends.dart';
+import 'package:mwendo_app/features/learn/data/legends.dart';
 import 'package:mwendo_app/features/safety/safety_service.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
+import 'package:mwendo_app/core/utils/haptics.dart';
+import 'package:mwendo_app/widgets/celebration_overlay.dart';
 import 'package:mwendo_app/core/theme/theme_mode_provider.dart';
 import 'package:mwendo_app/core/utils/format.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
 import 'package:mwendo_app/widgets/level_ring.dart';
 
-class ProfilePage extends ConsumerWidget {
+class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends ConsumerState<ProfilePage> {
+  int _prevLevel = 0;
+  bool _showLevelUp = false;
+  String _levelUpTitle = '';
+  _StatRange _range = _StatRange.all;
+
+  void _setRange(_StatRange r) {
+    if (r == _range) return;
+    Haptics.selection();
+    setState(() => _range = r);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _prevLevel = ref.read(gamificationProvider).level;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final g = ref.watch(gamificationProvider);
+    if (g.level > _prevLevel && _prevLevel > 0) {
+      _prevLevel = g.level;
+      Haptics.celebrate();
+      _levelUpTitle = 'Level ${g.level}';
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _showLevelUp = true);
+      });
+    } else {
+      _prevLevel = g.level;
+    }
     final locale = ref.watch(localeProvider);
     final mode = ref.watch(themeModeProvider);
     final profile = ref.watch(userProfileProvider);
@@ -36,178 +73,207 @@ class ProfilePage extends ConsumerWidget {
     final contacts = ref.watch(safetyContactsProvider);
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final runs = ref.watch(activitiesProvider).value ?? const <RunRecord>[];
+    final allBadges = [
+      ...ChallengeEvaluator.allChallenges.map((c) => c.badgeId),
+      ...specialBadges.keys,
+    ];
 
     final board = ref.watch(remoteLeaderboardProvider(g.xp)).when(
       data: (b) => b,
       loading: () => leaderboardWithUser(g.xp),
-      error: (_, _) => leaderboardWithUser(g.xp),
+      error: (_, __) => leaderboardWithUser(g.xp),
     ).take(5).toList();
     final rank = board.indexWhere((e) => e.you) + 1;
 
-    return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.all(AppTheme.s24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _EditPhotoSheet.show(context, ref),
-                        child: profile.photoPath != null
-                            ? CircleAvatar(
-                                radius: 34,
-                                backgroundImage: FileImage(File(profile.photoPath!)),
-                              )
-                            : const CircleAvatar(
-                                radius: 34,
-                                backgroundColor: AppTheme.brand,
-                                child: Icon(Icons.person_rounded, color: Colors.white, size: 36),
-                              ),
-                      ),
-                      const SizedBox(width: AppTheme.s16),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _EditNameSheet.show(context, ref, profile.username),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(profile.username, style: text.headlineLarge),
-                              Text('Level ${g.level} · ${g.title}',
-                                  style: text.bodyMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
-                            ],
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Scaffold(
+          body: SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.all(AppTheme.s24),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => _EditPhotoSheet.show(context, ref),
+                            child: profile.photoPath != null
+                                ? CircleAvatar(
+                                    radius: 34,
+                                    backgroundImage: FileImage(File(profile.photoPath!)),
+                                  )
+                                : const CircleAvatar(
+                                    radius: 34,
+                                    backgroundColor: AppTheme.brand,
+                                    child: Icon(Icons.person_rounded, color: Colors.white, size: 36),
+                                  ),
                           ),
-                        ),
+                          const SizedBox(width: AppTheme.s16),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _EditNameSheet.show(context, ref, profile.username),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(profile.username, style: text.headlineLarge),
+                                  Text('Level ${g.level} · ${g.title}',
+                                      style: text.bodyMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
+                                ],
+                              ),
+                            ),
+                          ),
+                          LevelRing(level: g.level, progress: g.levelProgress, size: 56),
+                        ],
                       ),
-                      LevelRing(level: g.level, progress: g.levelProgress, size: 56),
-                    ],
-                  ),
-                  const SizedBox(height: AppTheme.s16),
-                  Container(
-                    padding: const EdgeInsets.all(AppTheme.s16),
-                    decoration: BoxDecoration(
-                      color: cs.surface,
-                      borderRadius: BorderRadius.circular(AppTheme.r16),
-                    ),
-                    child: XpBar(
-                      xpIntoLevel: g.xpIntoLevel,
-                      xpForNextLevel: g.xpForNextLevel,
-                      progress: g.levelProgress,
-                    ),
-                  ),
-                  const SizedBox(height: AppTheme.s16),
-                  Row(
-                    children: [
-                      _StatTile(label: L10n.tr('distance', locale), value: formatDistanceUnits(g.totalDistanceM, units)),
-                      _StatTile(label: L10n.tr('runs', locale), value: g.totalRuns.toString()),
-                      _StatTile(label: L10n.tr('time', locale), value: formatDuration(g.totalTimeMs)),
-                      _StatTile(label: L10n.tr('streak', locale), value: '${g.streakDays}d'),
-                    ],
-                  ),
-                  const SizedBox(height: AppTheme.s28),
-                  SectionHeader(L10n.tr('achievements', locale)),
-                  const SizedBox(height: AppTheme.s12),
-                ]),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: AppTheme.s24),
-              sliver: g.earnedBadges.isEmpty
-                  ? SliverToBoxAdapter(
-                      child: Container(
-                        padding: const EdgeInsets.all(AppTheme.s20),
+                      const SizedBox(height: AppTheme.s16),
+                      Container(
+                        padding: const EdgeInsets.all(AppTheme.s16),
                         decoration: BoxDecoration(
                           color: cs.surface,
                           borderRadius: BorderRadius.circular(AppTheme.r16),
                         ),
-                        child: Text(
-                          L10n.tr('no_badges_yet', locale),
-                          style: text.bodyMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
+                        child: XpBar(
+                          xpIntoLevel: g.xpIntoLevel,
+                          xpForNextLevel: g.xpForNextLevel,
+                          progress: g.levelProgress,
                         ),
                       ),
-                    )
-                  : SliverGrid.count(
-                      crossAxisCount: 4,
-                      mainAxisSpacing: AppTheme.s12,
-                      crossAxisSpacing: AppTheme.s12,
-                      childAspectRatio: 0.8,
-                      children: g.earnedBadges
-                          .map((id) => _BadgeTile(id: id))
-                          .toList(),
+                      const SizedBox(height: AppTheme.s16),
+                      _StatsToggle(range: _range, onChanged: _setRange, locale: locale),
+                      const SizedBox(height: AppTheme.s16),
+                      _StatRow(g: g, range: _range, runs: runs, units: units, locale: locale),
+                      const SizedBox(height: AppTheme.s12),
+                      _QuickSettings(mode: mode, units: units, locale: locale, ref: ref),
+                      const SizedBox(height: AppTheme.s28),
+                      SectionHeader(L10n.tr('achievements', locale)),
+                      const SizedBox(height: AppTheme.s12),
+                    ]),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppTheme.s24),
+                  sliver: SliverGrid.count(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: AppTheme.s12,
+                    crossAxisSpacing: AppTheme.s12,
+                    childAspectRatio: 0.8,
+                    children: allBadges
+                        .map((id) => _TrophyTile(
+                              id: id,
+                              earned: g.earnedBadges.contains(id),
+                              index: allBadges.indexOf(id),
+                            ))
+                        .toList(),
+                  ),
+                ),
+                if (g.racedLegends.isNotEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(AppTheme.s24, AppTheme.s28, AppTheme.s24, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SectionHeader(L10n.tr('your_legends', locale)),
+                          const SizedBox(height: AppTheme.s12),
+                          SizedBox(
+                            height: 150,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: g.racedLegends.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: AppTheme.s12),
+                              itemBuilder: (_, i) {
+                                final ghost = ghostPaceForId(g.racedLegends.elementAt(i));
+                                final beaten = g.beatenLegends.contains(ghost.id);
+                                return _LegendMiniCard(ghost: ghost, beaten: beaten);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(AppTheme.s24),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      if (g.titles.isNotEmpty) ...[
+                        SectionHeader(L10n.tr('titles', locale)),
+                        const SizedBox(height: AppTheme.s12),
+                        Wrap(
+                          spacing: AppTheme.s8,
+                          runSpacing: AppTheme.s8,
+                          children: g.titles
+                              .map((t) => Chip(
+                                    label: Text(t,
+                                        style: text.labelMedium!.copyWith(color: AppTheme.brand)),
+                                    backgroundColor: AppTheme.brand.withValues(alpha: 0.14),
+                                    side: BorderSide.none,
+                                  ))
+                              .toList(),
+                        ),
+                        const SizedBox(height: AppTheme.s28),
+                      ],
+                      SectionHeader('${L10n.tr('leaderboard', locale)} · Rank #$rank'),
+                      const SizedBox(height: AppTheme.s12),
+                      ...board.map((e) => _LeaderRow(e: e, text: text, cs: cs)),
+                      const SizedBox(height: AppTheme.s28),
+                      SectionHeader(L10n.tr('account', locale)),
+                      const SizedBox(height: AppTheme.s12),
+                      _AccountTile(),
+                      const SizedBox(height: AppTheme.s28),
+                      SectionHeader(L10n.tr('settings', locale)),
+                      const SizedBox(height: AppTheme.s12),
+                      _LangTile(cs: cs, text: text, ref: ref, locale: locale),
+                      _SettingTile(
+                        icon: Icons.straighten_rounded,
+                        title: L10n.tr('units', locale),
+                        subtitle: units == Units.metric
+                            ? L10n.tr('metric', locale)
+                            : L10n.tr('imperial', locale),
+                        onTap: () => ref.read(unitsProvider.notifier).toggle(),
+                      ),
+                      _SettingTile(
+                        icon: Icons.brightness_6_rounded,
+                        title: L10n.tr('appearance', locale),
+                        subtitle: mode == ThemeMode.dark
+                            ? L10n.tr('dark', locale)
+                            : (mode == ThemeMode.light
+                                ? L10n.tr('light', locale)
+                                : L10n.tr('system', locale)),
+                        onTap: () => ref.read(themeModeProvider.notifier).cycle(),
+                      ),
+                      _SettingTile(
+                        icon: Icons.shield_outlined,
+                        title: L10n.tr('emergency_contacts', locale),
+                        subtitle: contacts.isEmpty
+                            ? L10n.tr('not_set', locale)
+                            : '${contacts.length} ${L10n.tr('emergency_contacts', locale)}',
+                        onTap: () => _EmergencyContactsSheet.show(context, ref),
+                      ),
+                      _SettingTile(
+                        icon: Icons.file_download_outlined,
+                        title: L10n.tr('export_data', locale),
+                        onTap: () => _exportData(context, ref, locale),
+                      ),
+                      const SizedBox(height: AppTheme.s24),
+                    ]),
+                  ),
+                ),
+              ],
             ),
-            SliverPadding(
-              padding: const EdgeInsets.all(AppTheme.s24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  if (g.titles.isNotEmpty) ...[
-                    SectionHeader(L10n.tr('titles', locale)),
-                    const SizedBox(height: AppTheme.s12),
-                    Wrap(
-                      spacing: AppTheme.s8,
-                      runSpacing: AppTheme.s8,
-                      children: g.titles
-                          .map((t) => Chip(
-                                label: Text(t,
-                                    style: text.labelMedium!.copyWith(color: AppTheme.brand)),
-                                backgroundColor: AppTheme.brand.withValues(alpha: 0.14),
-                                side: BorderSide.none,
-                              ))
-                          .toList(),
-                    ),
-                    const SizedBox(height: AppTheme.s28),
-                  ],
-                  SectionHeader('${L10n.tr('leaderboard', locale)} · Rank #$rank'),
-                  const SizedBox(height: AppTheme.s12),
-                  ...board.map((e) => _LeaderRow(e: e, text: text, cs: cs)),
-                  const SizedBox(height: AppTheme.s28),
-                  SectionHeader(L10n.tr('account', locale)),
-                  const SizedBox(height: AppTheme.s12),
-                  _AccountTile(),
-                  const SizedBox(height: AppTheme.s28),
-                  SectionHeader(L10n.tr('settings', locale)),
-                  const SizedBox(height: AppTheme.s12),
-                  _LangTile(cs: cs, text: text, ref: ref, locale: locale),
-                  _SettingTile(
-                    icon: Icons.straighten_rounded,
-                    title: L10n.tr('units', locale),
-                    subtitle: units == Units.metric
-                        ? L10n.tr('metric', locale)
-                        : L10n.tr('imperial', locale),
-                    onTap: () => ref.read(unitsProvider.notifier).toggle(),
-                  ),
-                  _SettingTile(
-                    icon: Icons.brightness_6_rounded,
-                    title: L10n.tr('appearance', locale),
-                    subtitle: mode == ThemeMode.dark
-                        ? L10n.tr('dark', locale)
-                        : (mode == ThemeMode.light
-                            ? L10n.tr('light', locale)
-                            : L10n.tr('system', locale)),
-                    onTap: () => ref.read(themeModeProvider.notifier).cycle(),
-                  ),
-                  _SettingTile(
-                    icon: Icons.shield_outlined,
-                    title: L10n.tr('emergency_contacts', locale),
-                    subtitle: contacts.isEmpty
-                        ? L10n.tr('not_set', locale)
-                        : '${contacts.length} ${L10n.tr('emergency_contacts', locale)}',
-                    onTap: () => _EmergencyContactsSheet.show(context, ref),
-                  ),
-                  _SettingTile(
-                    icon: Icons.file_download_outlined,
-                    title: L10n.tr('export_data', locale),
-                    onTap: () => _exportData(context, ref, locale),
-                  ),
-                  const SizedBox(height: AppTheme.s24),
-                ]),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        if (_showLevelUp)
+          CelebrationOverlay(
+            title: _levelUpTitle,
+            subtitle: L10n.tr('level_up_subtitle', locale),
+            onDone: () => setState(() => _showLevelUp = false),
+          ),
+      ],
     );
   }
 }
@@ -215,6 +281,7 @@ class ProfilePage extends ConsumerWidget {
 class SectionHeader extends StatelessWidget {
   final String title;
   const SectionHeader(this.title, {super.key});
+
   @override
   Widget build(BuildContext context) => Text(title, style: Theme.of(context).textTheme.titleLarge);
 }
@@ -244,24 +311,222 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-class _BadgeTile extends StatelessWidget {
+class _TrophyTile extends StatefulWidget {
   final String id;
-  const _BadgeTile({required this.id});
+  final bool earned;
+  final int index;
+  const _TrophyTile({required this.id, required this.earned, required this.index});
+
+  @override
+  State<_TrophyTile> createState() => _TrophyTileState();
+}
+
+class _TrophyTileState extends State<_TrophyTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 360),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(Duration(milliseconds: widget.index * 35), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final meta = badgeMeta(id);
+    final meta = badgeMeta(widget.id);
     final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(AppTheme.r16)),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+    return ScaleTransition(
+      scale: CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
+      child: Container(
+        decoration: BoxDecoration(
+          color: widget.earned ? cs.surface : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppTheme.r16),
+          border: widget.earned
+              ? Border.all(color: AppTheme.tierGold.withValues(alpha: 0.5))
+              : null,
+          boxShadow: widget.earned
+              ? [BoxShadow(color: AppTheme.tierGold.withValues(alpha: 0.25), blurRadius: 12, spreadRadius: 1)]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Text(meta.emoji, style: TextStyle(fontSize: 28, color: widget.earned ? null : Colors.white24)),
+                if (!widget.earned)
+                  const Icon(Icons.lock_rounded, size: 14, color: Colors.white38),
+              ],
+            ),
+            const SizedBox(height: AppTheme.s6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppTheme.s4),
+              child: Text(meta.name,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall!
+                      .copyWith(color: widget.earned ? null : cs.onSurface.withValues(alpha: 0.4)),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatsToggle extends StatelessWidget {
+  final _StatRange range;
+  final ValueChanged<_StatRange> onChanged;
+  final AppLocale locale;
+  const _StatsToggle({required this.range, required this.onChanged, required this.locale});
+
+  @override
+  Widget build(BuildContext context) => SegmentedButton<_StatRange>(
+        selected: {range},
+        showSelectedIcon: false,
+        onSelectionChanged: (s) => onChanged(s.first),
+        segments: [
+          ButtonSegment(value: _StatRange.week, label: Text(L10n.tr('stats_week', locale))),
+          ButtonSegment(value: _StatRange.month, label: Text(L10n.tr('stats_month', locale))),
+          ButtonSegment(value: _StatRange.all, label: Text(L10n.tr('all', locale))),
+        ],
+      );
+}
+
+class _StatRow extends StatelessWidget {
+  final GamificationState g;
+  final _StatRange range;
+  final List<RunRecord> runs;
+  final Units units;
+  final AppLocale locale;
+  const _StatRow({required this.g, required this.range, required this.runs, required this.units, required this.locale});
+
+  @override
+  Widget build(BuildContext context) {
+    late final List<({String label, String value})> tiles;
+    if (range == _StatRange.all) {
+      tiles = [
+        (label: L10n.tr('distance', locale), value: formatDistanceUnits(g.totalDistanceM, units)),
+        (label: L10n.tr('runs', locale), value: g.totalRuns.toString()),
+        (label: L10n.tr('time', locale), value: formatDuration(g.totalTimeMs)),
+        (label: L10n.tr('streak', locale), value: '${g.streakDays}d'),
+      ];
+    } else {
+      final cutoff = DateTime.now().subtract(Duration(days: range == _StatRange.week ? 7 : 30));
+      final filtered = runs.where((r) => r.startedAt.isAfter(cutoff)).toList();
+      final dist = filtered.fold(0.0, (s, r) => s + r.distanceM);
+      final dur = filtered.fold(0, (s, r) => s + r.durationMs);
+      final avgPace = dist > 0 ? (dur / 60000) / (dist / 1000) : 0.0;
+      tiles = [
+        (label: L10n.tr('distance', locale), value: formatDistanceUnits(dist, units)),
+        (label: L10n.tr('runs', locale), value: filtered.length.toString()),
+        (label: L10n.tr('time', locale), value: formatDuration(dur)),
+        (label: L10n.tr('avg_pace', locale), value: avgPace > 0 ? formatPace(avgPace) : '--'),
+      ];
+    }
+    return Row(
+      children: tiles.map((t) => _StatTile(label: t.label, value: t.value)).toList(),
+    );
+  }
+}
+
+class _QuickSettings extends StatelessWidget {
+  final ThemeMode mode;
+  final Units units;
+  final AppLocale locale;
+  final WidgetRef ref;
+  const _QuickSettings({required this.mode, required this.units, required this.locale, required this.ref});
+
+  @override
+  Widget build(BuildContext context) => Row(
         children: [
-          Text(meta.emoji, style: const TextStyle(fontSize: 28)),
-          const SizedBox(height: AppTheme.s6),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.s4),
-            child: Text(meta.name, style: Theme.of(context).textTheme.labelSmall, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+          _QuickChip(icon: Icons.straighten_rounded, label: units == Units.metric ? L10n.tr('metric', locale) : L10n.tr('imperial', locale), onTap: () => ref.read(unitsProvider.notifier).toggle()),
+          const SizedBox(width: AppTheme.s8),
+          _QuickChip(icon: Icons.brightness_6_rounded, label: mode == ThemeMode.dark ? L10n.tr('dark', locale) : (mode == ThemeMode.light ? L10n.tr('light', locale) : L10n.tr('system', locale)), onTap: () => ref.read(themeModeProvider.notifier).cycle()),
+          const SizedBox(width: AppTheme.s8),
+          _QuickChip(icon: Icons.language_rounded, label: locale == AppLocale.english ? 'EN' : 'SW', onTap: () => ref.read(localeProvider.notifier).toggle()),
+        ],
+      );
+}
+
+class _QuickChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _QuickChip({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.r12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: AppTheme.s10),
+          decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(AppTheme.r12)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: AppTheme.brand),
+              const SizedBox(width: AppTheme.s6),
+              Text(label, style: Theme.of(context).textTheme.labelMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.8))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LegendMiniCard extends ConsumerWidget {
+  final GhostPace ghost;
+  final bool beaten;
+  const _LegendMiniCard({required this.ghost, required this.beaten});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(localeProvider);
+    final l = ghost.legend;
+    final cs = Theme.of(context).colorScheme;
+    final accent = legendAccent(l);
+    return Container(
+      width: 130,
+      padding: const EdgeInsets.all(AppTheme.s12),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(AppTheme.r16),
+        border: beaten ? Border.all(color: accent.withValues(alpha: 0.6)) : null,
+      ),
+      child: Column(
+        children: [
+          CircleAvatar(radius: 22, backgroundColor: accent.withValues(alpha: 0.18), child: Text(l.emoji, style: const TextStyle(fontSize: 20))),
+          const SizedBox(height: AppTheme.s8),
+          Text(l.name, style: Theme.of(context).textTheme.labelMedium, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: AppTheme.s4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.s8, vertical: AppTheme.s2),
+            decoration: BoxDecoration(
+              color: (beaten ? Colors.green : AppTheme.idle).withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(AppTheme.rFull),
+            ),
+            child: Text(beaten ? L10n.tr('legend_beaten', locale) : L10n.tr('legend_raced', locale),
+                style: Theme.of(context).textTheme.labelSmall!.copyWith(color: beaten ? Colors.green : AppTheme.idle)),
           ),
         ],
       ),
@@ -434,7 +699,6 @@ Future<void> _exportData(
   }
 }
 
-/// Edit the display name.
 class _EditNameSheet {
   static void show(BuildContext context, WidgetRef ref, String current) {
     final ctrl = TextEditingController(text: current);
@@ -465,7 +729,6 @@ class _EditNameSheet {
   }
 }
 
-/// Pick or remove a profile photo.
 class _EditPhotoSheet {
   static void show(BuildContext context, WidgetRef ref) {
     final picker = ImagePicker();
@@ -517,8 +780,6 @@ class _EditPhotoSheet {
   }
 }
 
-/// Bottom-sheet to add, edit and remove emergency contacts. Persists via
-/// [safetyContactsProvider] so the SOS flow can reach them.
 class _EmergencyContactsSheet {
   static void show(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
@@ -556,25 +817,25 @@ class _EmergencyContactsBody extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-        children: [
-          Text(L10n.tr('emergency_contacts', locale), style: text.titleLarge),
+          children: [
+            Text(L10n.tr('emergency_contacts', locale), style: text.titleLarge),
             const Spacer(),
-          TextButton.icon(
-            onPressed: () => _editContact(context, ref, null, locale),
-            icon: const Icon(Icons.add_rounded),
-            label: Text(L10n.tr('add_contact', locale)),
-          ),
+            TextButton.icon(
+              onPressed: () => _editContact(context, ref, null, locale),
+              icon: const Icon(Icons.add_rounded),
+              label: Text(L10n.tr('add_contact', locale)),
+            ),
           ],
         ),
         const SizedBox(height: AppTheme.s12),
-            if (contacts.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppTheme.s16),
-                child: Text(L10n.tr('no_contacts_yet', locale),
-                    style: text.bodyMedium!.copyWith(
-                        color: cs.onSurface.withValues(alpha: 0.6))),
-              )
-            else
+        if (contacts.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppTheme.s16),
+            child: Text(L10n.tr('no_contacts_yet', locale),
+                style: text.bodyMedium!.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.6))),
+          )
+        else
           ListView.separated(
             shrinkWrap: true,
             itemCount: contacts.length,
@@ -662,3 +923,5 @@ class _EmergencyContactsBody extends ConsumerWidget {
     );
   }
 }
+
+enum _StatRange { week, month, all }

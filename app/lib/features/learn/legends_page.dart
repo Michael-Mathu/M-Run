@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
+import 'package:mwendo_app/core/utils/haptics.dart';
 import 'package:mwendo_app/features/learn/data/legends.dart';
 
 class LegendsPage extends StatefulWidget {
@@ -44,7 +45,6 @@ class _LegendsPageState extends State<LegendsPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Legends'), centerTitle: false),
@@ -75,7 +75,10 @@ class _LegendsPageState extends State<LegendsPage> {
                   label: 'Country',
                   options: const ['All', 'Kenya', 'Ethiopia', 'Uganda'],
                   selected: _country,
-                  onSelected: (v) => setState(() => _country = v),
+                  onSelected: (v) {
+                    Haptics.light();
+                    setState(() => _country = v);
+                  },
                 ),
                 const SizedBox(height: AppTheme.s8),
                 _ChipRow(
@@ -91,14 +94,20 @@ class _LegendsPageState extends State<LegendsPage> {
                     'Cross Country',
                   ],
                   selected: _discipline,
-                  onSelected: (v) => setState(() => _discipline = v),
+                  onSelected: (v) {
+                    Haptics.light();
+                    setState(() => _discipline = v);
+                  },
                 ),
                 const SizedBox(height: AppTheme.s8),
                 _ChipRow(
                   label: 'Era',
                   options: const ['All', '1960s–70s', '1980s–90s', '2000s–10s', '2020s+'],
                   selected: _era,
-                  onSelected: (v) => setState(() => _era = v),
+                  onSelected: (v) {
+                    Haptics.light();
+                    setState(() => _era = v);
+                  },
                 ),
                 const SizedBox(height: AppTheme.s12),
               ]),
@@ -108,11 +117,8 @@ class _LegendsPageState extends State<LegendsPage> {
             padding: const EdgeInsets.fromLTRB(AppTheme.s24, 0, AppTheme.s24, AppTheme.s24),
             sliver: _filtered.isEmpty
                 ? SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: AppTheme.s32),
-                      child: Text('No legends match your filters.',
-                          style: text.bodyMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
-                          textAlign: TextAlign.center),
+                    child: _SearchEmpty(
+                      onSuggestion: (q) => setState(() => _query = q),
                     ),
                   )
                 : SliverGrid.count(
@@ -122,6 +128,48 @@ class _LegendsPageState extends State<LegendsPage> {
                     childAspectRatio: 0.92,
                     children: _filtered.map((l) => _LegendCard(legend: l)).toList(),
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchEmpty extends StatelessWidget {
+  final ValueChanged<String> onSuggestion;
+  const _SearchEmpty({required this.onSuggestion});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    const popular = ['Kipchoge', 'Ethiopia', 'Kipyegon', 'Cheptegei', 'Haile'];
+    return Padding(
+      padding: const EdgeInsets.only(top: AppTheme.s24),
+      child: Column(
+        children: [
+          Icon(Icons.search_off_rounded,
+              size: 44, color: cs.onSurface.withValues(alpha: 0.25)),
+          const SizedBox(height: AppTheme.s12),
+          Text('No legends match your filters.', style: text.titleMedium),
+          const SizedBox(height: AppTheme.s4),
+          Text("Try 'Kipchoge' or 'Ethiopia'",
+              style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
+              textAlign: TextAlign.center),
+          const SizedBox(height: AppTheme.s16),
+          Text('Popular',
+              style: text.labelMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
+          const SizedBox(height: AppTheme.s8),
+          Wrap(
+            spacing: AppTheme.s8,
+            runSpacing: AppTheme.s8,
+            alignment: WrapAlignment.center,
+            children: popular
+                .map((p) => ActionChip(
+                      label: Text(p),
+                      onPressed: () => onSuggestion(p),
+                    ))
+                .toList(),
           ),
         ],
       ),
@@ -202,7 +250,10 @@ class _LegendCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppTheme.r16),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppTheme.r16),
-        onTap: () => context.go('/learn/legends/${legend.slug}'),
+        onTap: () {
+          Haptics.light();
+          context.go('/learn/legends/${legend.slug}');
+        },
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.s16),
           child: Column(

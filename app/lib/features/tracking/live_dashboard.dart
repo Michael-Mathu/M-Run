@@ -19,7 +19,6 @@ import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
 import 'package:mwendo_app/features/learn/data/beat_legends.dart';
 import 'package:mwendo_app/features/safety/safety_service.dart';
 import 'package:mwendo_app/features/tracking/tracking_controller.dart';
-import 'package:mwendo_app/features/tracking/widgets/metric_tile.dart';
 import 'package:mwendo_app/widgets/celebration_overlay.dart';
 import 'package:mwendo_gps_engine/mwendo_gps_engine.dart';
 
@@ -69,13 +68,17 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
       Haptics.light();
     }
 
+    final isIdle = m.state == AppEngineState.idle;
+    final isRecording = m.state == AppEngineState.recording;
+
     return Scaffold(
       body: Stack(
         children: [
           Column(
             children: [
+              // Map takes full height when idle, split when recording
               Expanded(
-                flex: 58,
+                flex: isIdle ? 100 : 55,
                 child: Stack(
                   children: [
                     RepaintBoundary(
@@ -105,112 +108,154 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                   ],
                 ),
               ),
-              Expanded(
-                flex: 42,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: cs.surface,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(AppTheme.r24),
+              // Bottom panel - only show metrics when not idle
+              if (!isIdle)
+                Expanded(
+                  flex: 45,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(AppTheme.r24),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, -4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppTheme.s24,
+                      AppTheme.s20,
+                      AppTheme.s24,
+                      AppTheme.s16,
+                    ),
+                    child: Column(
+                      children: [
+                        // Drag handle
+                        Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: cs.onSurface.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: AppTheme.s16),
+                        // Primary metric: distance (large, hero)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildPrimaryMetric(
+                                value: (m.distanceM / 1000).toStringAsFixed(2),
+                                unit: 'km',
+                                label: L10n.tr('distance_label', locale),
+                                color: AppTheme.brand,
+                              ),
+                            ),
+                            const SizedBox(width: AppTheme.s24),
+                            Expanded(
+                              child: _buildPrimaryMetric(
+                                value: formatPace(m.paceMinPerKm),
+                                unit: '/km',
+                                label: L10n.tr('pace', locale),
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            const SizedBox(width: AppTheme.s24),
+                            Expanded(
+                              child: _buildPrimaryMetric(
+                                value: formatDuration(m.elapsedMs),
+                                unit: '',
+                                label: L10n.tr('time_label', locale),
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppTheme.s16),
+                        // Secondary metrics row
+                        Container(
+                          padding: const EdgeInsets.all(AppTheme.s12),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(AppTheme.r12),
+                          ),
+                          child: Row(
+                            children: [
+                              _buildSecondaryMetric(
+                                icon: Icons.favorite_rounded,
+                                value: m.heartRate?.toString() ?? '--',
+                                unit: 'bpm',
+                                color: m.heartRate != null
+                                    ? AppTheme.hrZones[math.min(
+                                        4,
+                                        ((m.heartRate! - 110) ~/ 20).clamp(0, 4),
+                                      )]
+                                    : cs.onSurface.withValues(alpha: 0.5),
+                              ),
+                              _buildDivider(cs),
+                              _buildSecondaryMetric(
+                                icon: Icons.trending_up_rounded,
+                                value: m.cadence?.toString() ?? '--',
+                                unit: 'spm',
+                                color: cs.onSurface,
+                              ),
+                              _buildDivider(cs),
+                              _buildSecondaryMetric(
+                                icon: Icons.terrain_rounded,
+                                value: m.elevationGainM.toStringAsFixed(0),
+                                unit: 'm',
+                                color: cs.onSurface,
+                              ),
+                              _buildDivider(cs),
+                              _buildSecondaryMetric(
+                                icon: Icons.local_fire_department_rounded,
+                                value: m.calories.toString(),
+                                unit: 'kcal',
+                                color: cs.onSurface,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  padding: const EdgeInsets.fromLTRB(
-                    AppTheme.s24,
-                    AppTheme.s20,
-                    AppTheme.s24,
-                    AppTheme.s24,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      MetricTile(
-                        value: (m.distanceM / 1000).toStringAsFixed(2),
-                        unit: 'km',
-                        label: L10n.tr('distance_label', locale),
-                        accent: AppTheme.brand,
-                        hero: true,
-                      ),
-                      const SizedBox(height: AppTheme.s16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: MetricTile(
-                              value: formatPace(m.paceMinPerKm),
-                              unit: '/km',
-                              label: L10n.tr('pace', locale),
-                            ),
-                          ),
-                          Expanded(
-                            child: MetricTile(
-                              value: formatDuration(m.elapsedMs),
-                              unit: '',
-                              label: L10n.tr('time_label', locale),
-                            ),
-                          ),
-                          Expanded(
-                            child: MetricTile(
-                              value: m.heartRate?.toString() ?? '--',
-                              unit: 'bpm',
-                              label: L10n.tr('heart_rate', locale),
-                              accent: m.heartRate != null
-                                  ? AppTheme.hrZones[math.min(
-                                      4,
-                                      ((m.heartRate! - 110) ~/ 20).clamp(0, 4),
-                                    )]
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppTheme.s12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: MetricTile(
-                              value: m.cadence?.toString() ?? '--',
-                              unit: 'spm',
-                              label: L10n.tr('cadence', locale),
-                            ),
-                          ),
-                          Expanded(
-                            child: MetricTile(
-                              value: m.elevationGainM.toStringAsFixed(0),
-                              unit: 'm',
-                              label: L10n.tr('elev_label', locale),
-                            ),
-                          ),
-                          Expanded(
-                            child: MetricTile(
-                              value: m.calories.toString(),
-                              unit: 'kcal',
-                              label: L10n.tr('calories_label', locale),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
                 ),
-              ),
             ],
           ),
-          Positioned(
-            bottom: AppTheme.s32,
-            right: AppTheme.s24,
-            child: _ControlCluster(
-              state: m.state,
-              onStart: () => _requestAndStart(ref, context),
-              onPause: () {
-                Haptics.light();
-                ref.read(trackingModelProvider.notifier).pause();
-              },
-              onResume: () {
-                Haptics.light();
-                ref.read(trackingModelProvider.notifier).resume();
-              },
-              onStop: () => _onStop(ref),
+          // Control buttons - positioned differently based on state
+          if (isIdle)
+            Positioned(
+              bottom: MediaQuery.of(context).padding.bottom + AppTheme.s32,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _StartButton(
+                  onStart: () => _requestAndStart(ref, context),
+                ),
+              ),
+            )
+          else
+            Positioned(
+              bottom: MediaQuery.of(context).padding.bottom + AppTheme.s16,
+              left: 0,
+              right: 0,
+              child: _ControlBar(
+                isRecording: isRecording,
+                onPause: () {
+                  Haptics.light();
+                  ref.read(trackingModelProvider.notifier).pause();
+                },
+                onResume: () {
+                  Haptics.light();
+                  ref.read(trackingModelProvider.notifier).resume();
+                },
+                onStop: () => _onStop(ref),
+              ),
             ),
-          ),
           if (_celebrate != null)
             CelebrationOverlay(
               title: _celebrate!.title,
@@ -219,6 +264,84 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPrimaryMetric({
+    required String value,
+    required String unit,
+    required String label,
+    required Color color,
+  }) {
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: text.displaySmall!.copyWith(
+            fontWeight: FontWeight.w800,
+            color: color,
+            fontFeatures: const [FontFeature.tabularFigures()],
+            height: 1.0,
+          ),
+        ),
+        if (unit.isNotEmpty)
+          Text(
+            unit,
+            style: text.bodyMedium!.copyWith(
+              color: color.withValues(alpha: 0.6),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        const SizedBox(height: AppTheme.s4),
+        Text(
+          label.toUpperCase(),
+          style: text.labelSmall!.copyWith(
+            color: color.withValues(alpha: 0.5),
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSecondaryMetric({
+    required IconData icon,
+    required String value,
+    required String unit,
+    required Color color,
+  }) {
+    final text = Theme.of(context).textTheme;
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 16, color: color.withValues(alpha: 0.7)),
+          const SizedBox(height: AppTheme.s4),
+          Text(
+            value,
+            style: text.titleMedium!.copyWith(
+              fontWeight: FontWeight.w700,
+              color: color,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          Text(
+            unit,
+            style: text.labelSmall!.copyWith(
+              color: color.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider(ColorScheme cs) {
+    return Container(
+      width: 1,
+      height: 40,
+      color: cs.onSurface.withValues(alpha: 0.1),
     );
   }
 
@@ -326,40 +449,50 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
 
   void _onStop(WidgetRef ref) async {
     Haptics.heavy();
+    // Capture ALL state BEFORE calling stop() which resets to initial.
     final m = ref.read(trackingModelProvider);
+    final trackPoints = List<TrackPoint>.from(m.trackPoints);
+    final distanceM = m.distanceM;
+    final elapsedMs = m.elapsedMs;
+    final elevationGainM = m.elevationGainM;
+    final calories = m.calories;
     final ghost = ref.read(ghostTargetProvider);
+
     await ref.read(trackingModelProvider.notifier).stop();
-    if (m.distanceM < 1) {
+
+    if (distanceM < 1) {
       ref.read(ghostTargetProvider.notifier).set(null);
       return;
     }
+
     final record = runRecordFromSession(
-      trackPoints: m.trackPoints,
-      distanceM: m.distanceM,
-      durationMs: m.elapsedMs,
-      elevationGainM: m.elevationGainM,
-      calories: m.calories,
+      trackPoints: trackPoints,
+      distanceM: distanceM,
+      durationMs: elapsedMs,
+      elevationGainM: elevationGainM,
+      calories: calories,
     );
     await ref.read(activityRepositoryProvider.future).then((repo) => repo.save(record));
     ref.invalidate(activitiesProvider);
-    final userAvgPace = m.distanceM > 0
-        ? (m.elapsedMs / 60000) / (m.distanceM / 1000)
+
+    final userAvgPace = distanceM > 0
+        ? (elapsedMs / 60000) / (distanceM / 1000)
         : 0.0;
     final newly = ref.read(gamificationProvider.notifier).completeRun(
-          distanceM: m.distanceM,
-          durationMs: m.elapsedMs,
-          elevationGainM: m.elevationGainM,
+          distanceM: distanceM,
+          durationMs: elapsedMs,
+          elevationGainM: elevationGainM,
           avgPaceMinPerKm: userAvgPace,
         );
     // B2: sync to the leaderboard when signed in; anonymous runs stay local.
     final session = ref.read(sessionProvider);
     if (!session.isAnonymous && mounted) {
       final ok = await ref.read(sessionProvider.notifier).submitRun(
-        distanceM: m.distanceM,
-        durationMs: m.elapsedMs,
-        elevationGainM: m.elevationGainM,
-        startedAt: m.trackPoints.isNotEmpty
-            ? m.trackPoints.first.timestamp
+        distanceM: distanceM,
+        durationMs: elapsedMs,
+        elevationGainM: elevationGainM,
+        startedAt: trackPoints.isNotEmpty
+            ? trackPoints.first.timestamp
             : DateTime.now(),
       );
       if (ok && mounted) {
@@ -369,7 +502,7 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
       }
     }
     if (ghost != null) {
-      final userAvg = (m.elapsedMs / 60000) / (m.distanceM / 1000);
+      final userAvg = (elapsedMs / 60000) / (distanceM / 1000);
       final beat = userAvg <= ghost.avgPaceMinPerKm;
       final newlyGhost = ref.read(gamificationProvider.notifier).recordBeatLegend(ghost, beat);
       if (mounted) {
@@ -391,73 +524,135 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
   }
 }
 
-class _ControlCluster extends ConsumerWidget {
-  final AppEngineState state;
+/// Professional start button for idle state - large, gradient, with icon
+class _StartButton extends ConsumerWidget {
   final VoidCallback onStart;
+  const _StartButton({required this.onStart});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(localeProvider);
+    return Semantics(
+      button: true,
+      label: L10n.tr('start_run_control', locale),
+      child: GestureDetector(
+        onTap: onStart,
+        child: Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            gradient: AppTheme.brandGradient,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.brand.withValues(alpha: 0.4),
+                blurRadius: 24,
+                spreadRadius: 4,
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.play_arrow_rounded,
+            size: 44,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Professional control bar for recording/paused state
+class _ControlBar extends StatelessWidget {
+  final bool isRecording;
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onStop;
-  const _ControlCluster({
-    required this.state,
-    required this.onStart,
+
+  const _ControlBar({
+    required this.isRecording,
     required this.onPause,
     required this.onResume,
     required this.onStop,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final recording = state == AppEngineState.recording;
-    final idle = state == AppEngineState.idle;
-    final mainLabel = idle
-        ? L10n.tr('start_run_control', ref.watch(localeProvider))
-        : (recording
-            ? L10n.tr('pause_run', ref.watch(localeProvider))
-            : L10n.tr('resume_run', ref.watch(localeProvider)));
-    return Row(
-      children: [
-        if (recording)
-          Padding(
-            padding: const EdgeInsets.only(right: AppTheme.s16),
-            child: Semantics(
-              button: true,
-              label: L10n.tr('stop_run', ref.watch(localeProvider)),
-              child: FloatingActionButton(
-                heroTag: 'stop',
-                backgroundColor: AppTheme.sos,
-                onPressed: onStop,
-                child: const Icon(Icons.stop_rounded, color: Colors.white),
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppTheme.s32),
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.s20, vertical: AppTheme.s12),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(AppTheme.rFull),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Stop button
+          Semantics(
+            button: true,
+            label: 'Stop run',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onStop,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.sos,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.stop_rounded, color: Colors.white, size: 24),
+                ),
               ),
             ),
           ),
-        Semantics(
-          button: true,
-          label: mainLabel,
-          child: FloatingActionButton.large(
-            heroTag: 'main',
-            backgroundColor: idle
-                ? AppTheme.brand
-                : (recording ? AppTheme.paused : AppTheme.brand),
-            elevation: 8,
-            onPressed: () {
-              if (idle) {
-                onStart();
-              } else if (recording) {
-                onPause();
-              } else {
-                onResume();
-              }
-            },
-            child: Icon(
-              idle
-                  ? Icons.play_arrow_rounded
-                  : (recording ? Icons.pause_rounded : Icons.play_arrow_rounded),
-              size: 40,
-              color: Colors.white,
+          // Main play/pause button
+          Semantics(
+            button: true,
+            label: isRecording ? 'Pause run' : 'Resume run',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: isRecording ? onPause : onResume,
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.brandGradient,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.brand.withValues(alpha: 0.3),
+                        blurRadius: 16,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    isRecording ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    size: 36,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ],
+          // Spacer for symmetry (placeholder for future lap button)
+          const SizedBox(width: 48),
+        ],
+      ),
     );
   }
 }
@@ -702,6 +897,7 @@ class _MapViewState extends State<_MapView> {
   bool _hasLocationPermission = false;
   bool _isSyncing = false;
   List<LatLng>? _pendingCoords;
+  bool _userInteracted = false;
 
   @override
   void initState() {
@@ -784,10 +980,9 @@ class _MapViewState extends State<_MapView> {
         lineBlur: 0.5,
       ),
     );
-    // Follow the *actual* end of the recorded path. We preserve the user's
-    // current zoom (never force 16) and never pan to the raw device fix, so the
-    // camera stays locked to the drawn route instead of drifting off it.
-    if (coords.isNotEmpty) {
+    // Only auto-follow the route if the user hasn't manually panned/zoomed.
+    // Once the user interacts with the map, we stop overriding the camera.
+    if (coords.isNotEmpty && !_userInteracted) {
       await ctrl.animateCamera(CameraUpdate.newLatLng(coords.last));
     }
   }
@@ -802,15 +997,19 @@ class _MapViewState extends State<_MapView> {
       ),
       styleString: widget.styleString,
       myLocationEnabled: _hasLocationPermission,
-      // `none` (not `tracking`): the camera must follow the *recorded* route
-      // polyline, not the raw device GPS fix. With `tracking`, MapLibre pans to
-      // the live fix, which diverges from the drawn line and makes the path
-      // look like it isn't following the runner. The blue dot still renders via
-      // `myLocationEnabled`.
+      // Use `none` tracking so the camera doesn't fight the user's manual
+      // gestures. The blue dot still shows via `myLocationEnabled`.
       myLocationTrackingMode: MyLocationTrackingMode.none,
       onMapCreated: (c) {
         _ctrl = c;
         _syncRoute();
+      },
+      onCameraIdle: () {
+        // User has moved the camera manually - stop auto-following.
+        _userInteracted = true;
+      },
+      onUserLocationUpdated: (location) {
+        // We don't auto-follow raw GPS, only the drawn route.
       },
     );
   }

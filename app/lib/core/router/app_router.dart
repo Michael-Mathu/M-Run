@@ -215,47 +215,58 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
   Widget build(BuildContext context) {
     final locale = ref.watch(localeProvider);
     final runTabVisible = widget.shell.currentIndex == 2;
-    return Scaffold(
-      body: GestureDetector(
-        onHorizontalDragEnd: _onHorizontalDragEnd,
-        behavior: HitTestBehavior.translucent,
-        child: widget.shell,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: widget.shell.currentIndex,
-        onDestinationSelected: (i) {
-          if (i != widget.shell.currentIndex) Haptics.selection();
-          widget.shell.goBranch(i);
-        },
-        height: 72,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: [
-          _destination(
-            icon: const Icon(Icons.home_outlined),
-            selectedIcon: const Icon(Icons.home_rounded),
-            label: L10n.tr('home', locale),
-          ),
-          _destination(
-            icon: const Icon(Icons.emoji_events_outlined),
-            selectedIcon: const Icon(Icons.emoji_events_rounded),
-            label: L10n.tr('challenges', locale),
-          ),
-          NavigationDestination(
-            icon: _RunNavIcon(runTabVisible: runTabVisible),
-            selectedIcon: _RunNavIcon(runTabVisible: runTabVisible),
-            label: L10n.tr('run', locale),
-          ),
-          _destination(
-            icon: const Icon(Icons.school_outlined),
-            selectedIcon: const Icon(Icons.school_rounded),
-            label: L10n.tr('learn', locale),
-          ),
-          _destination(
-            icon: const Icon(Icons.person_outline_rounded),
-            selectedIcon: const Icon(Icons.person_rounded),
-            label: L10n.tr('profile', locale),
-          ),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          // System back button: go to home tab if not already there.
+          if (widget.shell.currentIndex != 0) {
+            widget.shell.goBranch(0);
+          }
+        }
+      },
+      child: Scaffold(
+        body: GestureDetector(
+          onHorizontalDragEnd: _onHorizontalDragEnd,
+          behavior: HitTestBehavior.translucent,
+          child: widget.shell,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: widget.shell.currentIndex,
+          onDestinationSelected: (i) {
+            if (i != widget.shell.currentIndex) Haptics.selection();
+            widget.shell.goBranch(i);
+          },
+          height: 72,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: [
+            _destination(
+              icon: const Icon(Icons.home_outlined),
+              selectedIcon: const Icon(Icons.home_rounded),
+              label: L10n.tr('home', locale),
+            ),
+            _destination(
+              icon: const Icon(Icons.emoji_events_outlined),
+              selectedIcon: const Icon(Icons.emoji_events_rounded),
+              label: L10n.tr('challenges', locale),
+            ),
+            NavigationDestination(
+              icon: _RunNavIcon(runTabVisible: runTabVisible),
+              selectedIcon: _RunNavIcon(runTabVisible: runTabVisible),
+              label: L10n.tr('run', locale),
+            ),
+            _destination(
+              icon: const Icon(Icons.school_outlined),
+              selectedIcon: const Icon(Icons.school_rounded),
+              label: L10n.tr('learn', locale),
+            ),
+            _destination(
+              icon: const Icon(Icons.person_outline_rounded),
+              selectedIcon: const Icon(Icons.person_rounded),
+              label: L10n.tr('profile', locale),
+            ),
+          ],
+        ),
       ),
     );
   }

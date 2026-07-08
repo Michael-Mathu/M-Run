@@ -156,18 +156,24 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: AppTheme.s24),
-                  sliver: SliverGrid.count(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: AppTheme.s12,
-                    crossAxisSpacing: AppTheme.s12,
-                    childAspectRatio: 0.8,
-                    children: allBadges
-                        .map((id) => _TrophyTile(
-                              id: id,
-                              earned: g.earnedBadges.contains(id),
-                              index: allBadges.indexOf(id),
-                            ))
-                        .toList(),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      mainAxisSpacing: AppTheme.s12,
+                      crossAxisSpacing: AppTheme.s12,
+                      childAspectRatio: 0.8,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final id = allBadges[index];
+                        return _TrophyTile(
+                          id: id,
+                          earned: g.earnedBadges.contains(id),
+                          index: index,
+                        );
+                      },
+                      childCount: allBadges.length,
+                    ),
                   ),
                 ),
                 if (g.racedLegends.isNotEmpty)
@@ -522,11 +528,11 @@ class _LegendMiniCard extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: AppTheme.s8, vertical: AppTheme.s2),
             decoration: BoxDecoration(
-              color: (beaten ? Colors.green : AppTheme.idle).withValues(alpha: 0.16),
+              color: (beaten ? AppTheme.recording : AppTheme.idle).withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(AppTheme.rFull),
             ),
             child: Text(beaten ? L10n.tr('legend_beaten', locale) : L10n.tr('legend_raced', locale),
-                style: Theme.of(context).textTheme.labelSmall!.copyWith(color: beaten ? Colors.green : AppTheme.idle)),
+                style: Theme.of(context).textTheme.labelSmall!.copyWith(color: beaten ? AppTheme.recording : AppTheme.idle)),
           ),
         ],
       ),

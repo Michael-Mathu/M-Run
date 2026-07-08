@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/haptics.dart';
 import 'package:mwendo_app/features/learn/data/legends.dart';
 
-class LegendsPage extends StatefulWidget {
+class LegendsPage extends ConsumerStatefulWidget {
   const LegendsPage({super.key});
 
   @override
-  State<LegendsPage> createState() => _LegendsPageState();
+  ConsumerState<LegendsPage> createState() => _LegendsPageState();
 }
 
-class _LegendsPageState extends State<LegendsPage> {
+class _LegendsPageState extends ConsumerState<LegendsPage> {
   final _q = TextEditingController();
   String _query = '';
   String _country = 'All';
@@ -45,9 +47,10 @@ class _LegendsPageState extends State<LegendsPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final locale = ref.watch(localeProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Legends'), centerTitle: false),
+      appBar: AppBar(title: Text(L10n.tr('legends_title', locale)), centerTitle: false),
       body: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -63,7 +66,7 @@ class _LegendsPageState extends State<LegendsPage> {
                     controller: _q,
                     onChanged: (v) => setState(() => _query = v),
                     decoration: InputDecoration(
-                      hintText: 'Search legends, countries…',
+                      hintText: L10n.tr('search_legends', locale),
                       prefixIcon: const Icon(Icons.search_rounded),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: AppTheme.s12),
@@ -72,7 +75,7 @@ class _LegendsPageState extends State<LegendsPage> {
                 ),
                 const SizedBox(height: AppTheme.s12),
                 _ChipRow(
-                  label: 'Country',
+                  label: L10n.tr('country', locale),
                   options: const ['All', 'Kenya', 'Ethiopia', 'Uganda'],
                   selected: _country,
                   onSelected: (v) {
@@ -82,7 +85,7 @@ class _LegendsPageState extends State<LegendsPage> {
                 ),
                 const SizedBox(height: AppTheme.s8),
                 _ChipRow(
-                  label: 'Discipline',
+                  label: L10n.tr('discipline', locale),
                   options: const [
                     'All',
                     'Marathon',
@@ -101,7 +104,7 @@ class _LegendsPageState extends State<LegendsPage> {
                 ),
                 const SizedBox(height: AppTheme.s8),
                 _ChipRow(
-                  label: 'Era',
+                  label: L10n.tr('era', locale),
                   options: const ['All', '1960s–70s', '1980s–90s', '2000s–10s', '2020s+'],
                   selected: _era,
                   onSelected: (v) {
@@ -143,6 +146,9 @@ class _SearchEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
+    final locale = Localizations.localeOf(context).languageCode == 'sw'
+        ? AppLocale.swahili
+        : AppLocale.english;
     const popular = ['Kipchoge', 'Ethiopia', 'Kipyegon', 'Cheptegei', 'Haile'];
     return Padding(
       padding: const EdgeInsets.only(top: AppTheme.s24),
@@ -151,13 +157,13 @@ class _SearchEmpty extends StatelessWidget {
           Icon(Icons.search_off_rounded,
               size: 44, color: cs.onSurface.withValues(alpha: 0.25)),
           const SizedBox(height: AppTheme.s12),
-          Text('No legends match your filters.', style: text.titleMedium),
+          Text(L10n.tr('no_legends_match', locale), style: text.titleMedium),
           const SizedBox(height: AppTheme.s4),
-          Text("Try 'Kipchoge' or 'Ethiopia'",
+          Text(L10n.tr('try_search', locale),
               style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
               textAlign: TextAlign.center),
           const SizedBox(height: AppTheme.s16),
-          Text('Popular',
+          Text(L10n.tr('popular_legends', locale),
               style: text.labelMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
           const SizedBox(height: AppTheme.s8),
           Wrap(

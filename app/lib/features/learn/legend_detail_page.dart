@@ -625,12 +625,12 @@ class _CompareRow extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: AppTheme.s8, vertical: AppTheme.s2),
                 decoration: BoxDecoration(
-                  color: gapPct <= 0 ? Colors.green.withValues(alpha: 0.16) : accent.withValues(alpha: 0.16),
+                  color: gapPct <= 0 ? AppTheme.recording.withValues(alpha: 0.16) : accent.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(AppTheme.rFull),
                 ),
                 child: Text('+${gapPct.toStringAsFixed(0)}%',
                     style: text.labelSmall!.copyWith(
-                        color: gapPct <= 0 ? Colors.green : accent, fontWeight: FontWeight.w700)),
+                        color: gapPct <= 0 ? AppTheme.recording : accent, fontWeight: FontWeight.w700)),
               ),
             ],
           ),

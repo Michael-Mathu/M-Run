@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
@@ -235,8 +236,10 @@ class _SplitsChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = legendAccent(g.legend);
-    final max = g.splits.reduce((a, b) => a > b ? a : b);
-    final min = g.splits.reduce((a, b) => a < b ? a : b);
+    final (min, max) = g.splits.fold<(double, double)>(
+      (double.infinity, double.negativeInfinity),
+      ((double, double) acc, double v) => (math.min(acc.$1, v), math.max(acc.$2, v)),
+    );
     return LineChart(
       LineChartData(
         lineBarsData: [

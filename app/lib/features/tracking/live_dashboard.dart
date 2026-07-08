@@ -54,6 +54,7 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
   Widget build(BuildContext context) {
     final m = ref.watch(trackingModelProvider);
     final cs = Theme.of(context).colorScheme;
+    final locale = ref.watch(localeProvider);
     final ghost = ref.watch(ghostTargetProvider);
     final mapSource = ref.watch(mapSourceProvider);
     final offlineStyle = ref.watch(offlineMapProvider).value?.style;
@@ -125,7 +126,7 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                       MetricTile(
                         value: (m.distanceM / 1000).toStringAsFixed(2),
                         unit: 'km',
-                        label: 'Distance',
+                        label: L10n.tr('distance_label', locale),
                         accent: AppTheme.brand,
                         hero: true,
                       ),
@@ -136,21 +137,21 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                             child: MetricTile(
                               value: formatPace(m.paceMinPerKm),
                               unit: '/km',
-                              label: 'Pace',
+                              label: L10n.tr('pace', locale),
                             ),
                           ),
                           Expanded(
                             child: MetricTile(
                               value: formatDuration(m.elapsedMs),
                               unit: '',
-                              label: 'Time',
+                              label: L10n.tr('time_label', locale),
                             ),
                           ),
                           Expanded(
                             child: MetricTile(
                               value: m.heartRate?.toString() ?? '--',
                               unit: 'bpm',
-                              label: 'Heart Rate',
+                              label: L10n.tr('heart_rate', locale),
                               accent: m.heartRate != null
                                   ? AppTheme.hrZones[math.min(
                                       4,
@@ -168,21 +169,21 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                             child: MetricTile(
                               value: m.cadence?.toString() ?? '--',
                               unit: 'spm',
-                              label: 'Cadence',
+                              label: L10n.tr('cadence', locale),
                             ),
                           ),
                           Expanded(
                             child: MetricTile(
                               value: m.elevationGainM.toStringAsFixed(0),
                               unit: 'm',
-                              label: 'Elev. Gain',
+                              label: L10n.tr('elev_label', locale),
                             ),
                           ),
                           Expanded(
                             child: MetricTile(
                               value: m.calories.toString(),
                               unit: 'kcal',
-                              label: 'Calories',
+                              label: L10n.tr('calories_label', locale),
                             ),
                           ),
                         ],
@@ -232,7 +233,7 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Location permission is required to track runs.'),
+            content: Text(L10n.tr('gps_permission_required', ref.read(localeProvider))),
             action: SnackBarAction(
               label: L10n.tr('open_settings', ref.read(localeProvider)),
               onPressed: () => openAppSettings(),
@@ -249,9 +250,7 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
     if (context.mounted && !background.isGranted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text(
-            'Grant "Allow all the time" so tracking continues with the screen off.',
-          ),
+          content: Text(L10n.tr('grant_background_location', ref.read(localeProvider))),
           action: SnackBarAction(
             label: 'Settings',
             onPressed: () => openAppSettings(),
@@ -262,10 +261,8 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
     final notif = await Permission.notification.request();
     if (context.mounted && !notif.isGranted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Enable notifications so tracking can keep running in the background.',
-          ),
+        SnackBar(
+          content: Text(L10n.tr('enable_notifications', ref.read(localeProvider))),
         ),
       );
     }

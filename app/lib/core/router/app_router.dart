@@ -214,6 +214,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
   @override
   Widget build(BuildContext context) {
     final locale = ref.watch(localeProvider);
+    final runTabVisible = widget.shell.currentIndex == 2;
     return Scaffold(
       body: GestureDetector(
         onHorizontalDragEnd: _onHorizontalDragEnd,
@@ -240,8 +241,8 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
             label: L10n.tr('challenges', locale),
           ),
           NavigationDestination(
-            icon: const _RunNavIcon(),
-            selectedIcon: const _RunNavIcon(),
+            icon: _RunNavIcon(runTabVisible: runTabVisible),
+            selectedIcon: _RunNavIcon(runTabVisible: runTabVisible),
             label: L10n.tr('run', locale),
           ),
           _destination(
@@ -262,8 +263,11 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
 
 /// Run tab icon. When not recording it emits a soft pulsing glow (attract
 /// mode); once recording the glow steadies into a solid red pulse.
+/// Pauses animation when the run tab is not visible to save CPU.
 class _RunNavIcon extends ConsumerStatefulWidget {
-  const _RunNavIcon();
+  final bool runTabVisible;
+  const _RunNavIcon({this.runTabVisible = true});
+
   @override
   ConsumerState<_RunNavIcon> createState() => _RunNavIconState();
 }
@@ -273,7 +277,23 @@ class _RunNavIconState extends ConsumerState<_RunNavIcon>
   late final AnimationController _pulse = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1400),
-  )..repeat(reverse: true);
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.runTabVisible) _pulse.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _RunNavIcon old) {
+    super.didUpdateWidget(old);
+    if (widget.runTabVisible && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!widget.runTabVisible && _pulse.isAnimating) {
+      _pulse.stop();
+    }
+  }
 
   @override
   void dispose() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
+import 'package:mwendo_app/core/theme/app_theme.dart';
 
 /// Full-screen confetti burst used for challenge completions / run milestones.
 class CelebrationOverlay extends StatefulWidget {
@@ -63,12 +64,12 @@ class _CelebrationOverlayState extends State<CelebrationOverlay> {
             children: [
               const Icon(Icons.emoji_events_rounded,
                   size: 72, color: Color(0xFFFFD15C)),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppTheme.s16),
               Text(widget.title,
                   style: text.headlineLarge!
                       .copyWith(color: Colors.white),
                   textAlign: TextAlign.center),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppTheme.s8),
               Text(widget.subtitle,
                   style: text.bodyLarge!
                       .copyWith(color: Colors.white70),

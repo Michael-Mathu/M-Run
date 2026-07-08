@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -165,8 +166,10 @@ class _ChartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    final max = values.reduce((a, b) => a > b ? a : b);
-    final min = values.reduce((a, b) => a < b ? a : b);
+    final (min, max) = values.fold<(double, double)>(
+      (double.infinity, double.negativeInfinity),
+      ((double, double) acc, double v) => (math.min(acc.$1, v), math.max(acc.$2, v)),
+    );
 
     return Container(
       padding: const EdgeInsets.all(AppTheme.s16),

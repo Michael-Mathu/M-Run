@@ -82,7 +82,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final board = ref.watch(remoteLeaderboardProvider(g.xp)).when(
       data: (b) => b,
       loading: () => leaderboardWithUser(g.xp),
-      error: (_, __) => leaderboardWithUser(g.xp),
+      error: (_, _) => leaderboardWithUser(g.xp),
     ).take(5).toList();
     final rank = board.indexWhere((e) => e.you) + 1;
 
@@ -184,7 +184,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: g.racedLegends.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: AppTheme.s12),
+                              separatorBuilder: (_, _) => const SizedBox(width: AppTheme.s12),
                               itemBuilder: (_, i) {
                                 final ghost = ghostPaceForId(g.racedLegends.elementAt(i));
                                 final beaten = g.beatenLegends.contains(ghost.id);

@@ -46,7 +46,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ),
             ),
           );
-          ref.read(gamificationCorruptedProvider.notifier).clear();
         }
       });
     }
@@ -422,8 +421,7 @@ class _DashboardChallengeCard extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 

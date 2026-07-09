@@ -101,6 +101,7 @@ From the audit/Kilo fixes just applied, the most likely runtime culprits are:
    **Fix** (just applied): add a 1‑second `Timer` in `TrackingModel` that drives `elapsedMs`
    independently of GPS. This ensures the timer ticks even on a GPS failure, and the dashboard
    reflects real progress.
+6.  **Missing INTERNET Permission (Fixed in v0.15)** — Because the map relies on fetching styles (Carto Dark) over the network, missing the `<uses-permission android:name="android.permission.INTERNET" />` declaration in the Android Manifest leads to immediate `SecurityException` crashes from MapLibre's C++ core whenever location is granted, or a completely black map if the activity survives.
 
 ## Next steps
 

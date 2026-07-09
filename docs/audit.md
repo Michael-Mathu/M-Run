@@ -371,6 +371,11 @@
 
 16. **Fixed Moving Time stopwatch leak** (`tracking_controller.dart`) — The internal `_movingStart` timer now correctly resets to `null` and commits its delta to `_accumulatedMovingMs` when speed drops below `0.3 m/s` (stops moving). Previously, the clock kept ticking behind the scenes. When the runner resumed, the accumulated idle time was incorrectly added to their moving time, distorting average pace.
 
+### Fixes Applied — Infrastructure & Stability (v0.15 Hotfixes)
+
+17. **Added INTERNET Permission** (`app/android/app/src/main/AndroidManifest.xml`) — After removing the offline map server, MapLibre required internet access to fetch the Carto Dark style JSON. The missing `android.permission.INTERNET` caused an immediate `SecurityException` and native SIGABRT crash when location was granted, followed by black maps on subsequent launches. This is now fixed.
+18. **Automated GitHub Release CI** (`.github/workflows/release.yml`) — Added a GitHub Actions workflow using Java 21 to automatically compile `app-debug.apk` and attach it to GitHub Releases whenever a `v*` tag is pushed.
+
 ---
 
 ## 17. Feature Completeness Scorecard (Post-Audit)

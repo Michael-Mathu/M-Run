@@ -40,6 +40,7 @@ leaderboards.
   screen or a backgrounded app.
 - **Live dashboard** — distance, elapsed time, current & average pace, speed, heart rate, cadence,
   elevation gain, and calories update in real time.
+- **Smart Time Tracking** — distinguishes between total elapsed time and actual moving time, seamlessly pausing the running pace calculation when you are stationary.
 - **Live map** — a breadcrumb trail and current-location marker that follow you as you move.
 - **Wall-clock timer** — the run timer ticks from the moment you press Start, independent of GPS
   signal, so it never appears frozen when satellites are scarce.
@@ -48,12 +49,11 @@ leaderboards.
   race.
 
 ### Maps that work anywhere
-- **MapLibre GL basemap** — a single shared map widget renders the free, key-less Carto dark style
-  (`basemaps.cartocdn.com`), which works globally including across East Africa.
+- **MapLibre GL basemap** — a single shared map widget renders the highly legible Carto Dark style
+  over a seamless WebGL engine. Requires an internet connection for tile fetching, providing crisp, zoomable cartography globally.
 - **One map, two modes** — the live tracking screen and the post-run activity detail screen share a
   single `MwendoMap` widget (`live` and `replay` modes), so their drawing and camera logic stay in
-  sync. Offline maps are on the roadmap via MapLibre's built-in offline regions API — the previous
-  custom loopback tile server was removed.
+  sync. All offline loopback server dependencies have been removed in favor of a stable online map client.
 
 ### Learn & celebrate
 - **Running education** — an in-app academy covering technique, training science, and health.
@@ -152,7 +152,8 @@ A few platform specifics worth knowing before you build or review:
   screen on also works.
 - **GPS plugin build fix.** `MwendoTrackingService.activityId` is package-visible (not `private`)
   and the `@SuppressLint` annotation was removed, because `androidx.annotation` is not on the AGP 9
-  classpath. Both are required for the APK to compile.
+  classpath. MapLibre GL currently requires a Java 21 compilation environment.
+- **Automated CI/CD via GitHub Actions.** Pushing a `v*` tag to the repository triggers a GitHub Actions workflow that automatically compiles a debug APK (with Java 21) and attaches it to a newly created GitHub Release.
 - **The run timer is wall-clock driven.** `elapsedMs` is accumulated by a 1s ticker started on
   `start()` and banked on pause/stop. GPS feeds distance, pace, and calories only — the timer
   itself never depends on a satellite fix. A run that moves less than 1 m is still not saved (the

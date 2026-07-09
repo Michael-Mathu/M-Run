@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
@@ -230,6 +232,9 @@ class _MwendoMapState extends State<MwendoMap> {
         zoom: _isLive ? 12 : widget.zoom,
       ),
       styleString: widget.styleString,
+      gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{
+        Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
+      },
       myLocationEnabled: widget.locationEnabled,
       myLocationTrackingMode: _trackingMode,
       onMapCreated: (c) {

@@ -181,7 +181,7 @@ class _ChartCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: text.titleMedium),
-          Text('$min–$max $unit',
+          Text('${min.toStringAsFixed(0)}–${max.toStringAsFixed(0)} $unit',
               style: text.bodySmall!
                   .copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
           const SizedBox(height: AppTheme.s12),

@@ -2,6 +2,8 @@
 
 # Mwendo
 
+<img src="app/assets/logo.png" width="200" alt="Mwendo Logo" />
+
 **The open-source running tracker, teacher, and challenge platform — built in Kenya, for the world.**
 
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white)](https://flutter.dev)

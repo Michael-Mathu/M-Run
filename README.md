@@ -2,7 +2,7 @@
 
 # Mwendo
 
-<img src="app/assets/logo.png" width="200" alt="Mwendo Logo" />
+<img src="app/assets/logo.jpeg" width="200" alt="Mwendo Logo" />
 
 **The open-source running tracker, teacher, and challenge platform — built in Kenya, for the world.**
 

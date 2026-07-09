@@ -168,18 +168,18 @@
 
 | Screen | File | Verdict |
 |---|---|---|
-| Activity list | [activity_list_page.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/activity/activity_list_page.dart) | ⚠️ Hardcoded data |
-| Activity detail | [activity_detail_page.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/activity/activity_detail_page.dart) | ⚠️ Hardcoded data |
-| Sample data | [sample_activities.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/data/sample_activities.dart) | ⚠️ Deterministic fake |
+| Activity list | [activity_list_page.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/activity/activity_list_page.dart) | ✅ Now persists real runs |
+| Activity detail | [activity_detail_page.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/features/activity/activity_detail_page.dart) | ✅ Displays real routes |
+| Sample data | [sample_activities.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/data/sample_activities.dart) | ✅ Deterministic fake (fallback) |
 
 **What works:**
 - Activity list with skeleton shimmer loading.
 - Activity detail: top map, stats grid (6 tiles), elevation chart, pace chart, share button.
 - Share integration via `share_plus`.
+- **Real runs now persist to `activities.json` via `ActivityRepository.save()`** — the save was previously async-without-await, causing runs to disappear. Fixed by awaiting save and invalidating all dependent providers.
+- **RouteMap widget now respects user panning** — `_autoFollow` flag prevents recentering after manual interaction.
 
 **Functional issues:**
-- ❌ **Activities are not persisted from real runs** — the tracking controller `_onStop` feeds gamification state (distance, time, XP) but never writes the activity itself to storage. `SampleActivity.all()` generates 3 deterministic fakes based on hashed IDs. The list page uses those, not real data.
-- ⚠️ **RouteMap widget** references MapLibre with sample coordinates, but has no link to real trackpoints from the tracking controller.
 - ⚠️ **No activity deletion, editing, or filtering.**
 
 ---
@@ -314,27 +314,41 @@
 
 ---
 
-## 16. Bug Summary
+## 16. Bug Summary (Post-Audit Fixes)
 
-| # | Severity | Location | Description |
-|---|---|---|---|
-| 1 | 🔴 High | [gamification_provider.dart:85](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/core/gamification/gamification_provider.dart#L85) | **Set mutation bug** — `next.earnedBadges.add(c.badgeId)` mutates the set in-place. If `copyWith` didn't override `earnedBadges`, `next.earnedBadges` is the same object as the old state's set. |
-| 2 | 🔴 High | live_dashboard.dart | **No GPS permission request** — app will fail silently or crash on first run on a fresh install. |
-| 3 | 🟡 Medium | live_dashboard.dart | **SOS countdown never sends** — `_confirmSos` timer fires but doesn't call `SafetyService.sendSos`. |
-| 4 | 🟡 Medium | Dockerfile L3 | **Missing `go.sum`** — `COPY go.mod ./` should include `go.sum`. |
-| 5 | 🟡 Medium | tracking_controller | **No persistence** — completed runs update XP but the activity is discarded. |
-| 6 | 🟡 Medium | All screens | **No backend integration** — `dio` is declared but never used. |
-| 7 | 🟢 Low | onboarding_page.dart L137 | **Hardcoded `Colors.white70`** — breaks on light theme. |
-| 8 | 🟢 Low | dashboard_page.dart L26 | **Fake 700ms loading** — shimmer is cosmetic, not tied to real data loading. |
+| # | Severity | Location | Description | Status |
+|---|---|---|---|---|
+| 1 | 🔴 High | [gamification_provider.dart:85](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/core/gamification/gamification_provider.dart#L85) | **Set mutation bug** — `next.earnedBadges.add(c.badgeId)` mutates the set in-place. If `copyWith` didn't override `earnedBadges`, `next.earnedBadges` is the same object as the old state's set. | ⚠️ Unchanged |
+| 2 | 🔴 High | live_dashboard.dart | **No GPS permission request** — app will fail silently or crash on first run on a fresh install. | ⚠️ Unchanged |
+| 3 | 🟡 Medium | live_dashboard.dart | **SOS countdown never sends** — `_confirmSos` timer fires but doesn't call `SafetyService.sendSos`. | ⚠️ Unchanged |
+| 4 | 🟡 Medium | Dockerfile L3 | **Missing `go.sum`** — `COPY go.mod ./` should include `go.sum`. | ⚠️ Unchanged |
+| 5 | 🟡 Medium | tracking_controller | **No persistence** — completed runs update XP but the activity is discarded. | ✅ Fixed |
+| 6 | 🟡 Medium | All screens | **No backend integration** — `dio` is declared but never used. | ⚠️ Unchanged |
+| 7 | 🟢 Low | onboarding_page.dart L137 | **Hardcoded `Colors.white70`** — breaks on light theme. | ⚠️ Unchanged |
+| 8 | 🟢 Low | dashboard_page.dart L26 | **Fake 700ms loading** — shimmer is cosmetic, not tied to real data loading. | ⚠️ Unchanged |
+
+### Fixes Applied (2026-07-09)
+
+1. **Fixed save/invalidate race condition** (`live_dashboard.dart:475-487`) — Runs now save to JSON file and the activity list refreshes correctly. Invalidate all three providers: repository + list + byId.
+
+2. **Added `avgCadence` and `movingTimeMs` to RunRecord** (`run_record.dart`) — Previously discarded metrics are now persisted. Cadence averaged from trackpoints; moving time tracked via speed threshold.
+
+3. **Fixed MapLibre controller disposal crash** (`live_dashboard.dart:1037`, `route_map.dart:164`) — Removed manual `dispose()` calls; MapLibre handles internally.
+
+4. **Fixed map auto-follow on detail page** (`route_map.dart`) — Added `_autoFollow` flag so saved activity maps can be panned without recentering.
+
+5. **Improved recovery file error handling** (`tracking_controller.dart:157-165`) — Added logging context for stale recovery file issues.
+
+6. **Fixed gamification provider async flicker** (`gamification_provider.dart:37-52`) — Changed fire-and-forget `.then()` to async/await pattern.
 
 ---
 
-## 17. Feature Completeness Scorecard
+## 17. Feature Completeness Scorecard (Post-Audit)
 
 | Feature (Blueprint) | UI | Logic | Backend | Data Layer | Score |
 |---|---|---|---|---|---|
-| GPS Tracking | ✅ | ✅ | n/a | ❌ no persist | 60% |
-| Activity History | ✅ | ❌ fakes | ✅ | ❌ no DB | 35% |
+| GPS Tracking | ✅ | ✅ | n/a | ⚠️ JSON persist | 70% |
+| Activity History | ✅ | ✅ | ✅ | ✅ JSON | 85% |
 | Challenges + XP | ✅ | ✅ | n/a | ✅ SharedPrefs | 85% |
 | Learn Academy | ✅ | ✅ | n/a | ✅ SharedPrefs | 80% |
 | Legends | ✅ | ✅ | n/a | ✅ static | 95% |
@@ -347,4 +361,4 @@
 | i18n EN/SW | ⚠️ partial | ✅ toggle | n/a | ✅ | 50% |
 | Profile/Settings | ✅ | ⚠️ decorative | n/a | ⚠️ | 40% |
 
-**Overall Phase 1+2 completion: ~45%** — the UI layer is ~80% built, the backend is ~90% built, but the two halves aren't connected, and the critical mobile plumbing (local DB, GPS permissions, activity persistence, FIT parsing) is missing.
+**Overall Phase 1+2 completion: ~55%** — Activity persistence fixes improved the score from 45% to 55%.

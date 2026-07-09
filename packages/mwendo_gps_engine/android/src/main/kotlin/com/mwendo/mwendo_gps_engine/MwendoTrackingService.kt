@@ -124,7 +124,7 @@ class MwendoTrackingService : Service() {
     }
 
     private fun processLocation(location: Location) {
-        val speedMps = location.speed.toDouble()
+        val speedMps = maxOf(0.0, location.speed.toDouble())
         val state = classifyState(speedMps)
         if (lastLat != 0.0 && lastLng != 0.0) {
             val d = FloatArray(1)
@@ -137,17 +137,21 @@ class MwendoTrackingService : Service() {
         lastLat = location.latitude
         lastLng = location.longitude
         lastTime = location.time
-        listener?.onLocation(
-            mapOf(
-                "lat" to location.latitude,
-                "lng" to location.longitude,
-                "elevation" to location.altitude,
-                "timestamp" to location.time,
-                "speed_mps" to speedMps,
-                "accuracy" to location.accuracy,
-                "state" to state,
-            ),
-        )
+        try {
+            listener?.onLocation(
+                mapOf(
+                    "lat" to location.latitude,
+                    "lng" to location.longitude,
+                    "elevation" to location.altitude,
+                    "timestamp" to location.time.toLong(),
+                    "speed_mps" to speedMps,
+                    "accuracy" to (location.accuracy?.toInt() ?: 0),
+                    "state" to state,
+                ),
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun classifyState(speed: Double): String = when {

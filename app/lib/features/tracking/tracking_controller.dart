@@ -19,7 +19,7 @@ class TrackingState {
   final int? cadence;
   final double elevationGainM;
   final int calories;
-  final List<TrackPoint> trackPoints;
+  final int pointCount; // lightweight signal for UI, avoids copying _pts every tick
 
   const TrackingState({
     required this.state,
@@ -31,7 +31,7 @@ class TrackingState {
     this.cadence,
     this.elevationGainM = 0,
     this.calories = 0,
-    this.trackPoints = const [],
+    this.pointCount = 0,
   });
 
   static const initial = TrackingState(state: AppEngineState.idle);
@@ -46,7 +46,7 @@ class TrackingState {
     int? cadence,
     double? elevationGainM,
     int? calories,
-    List<TrackPoint>? trackPoints,
+    int? pointCount,
   }) =>
       TrackingState(
         state: state ?? this.state,
@@ -58,7 +58,7 @@ class TrackingState {
         cadence: cadence ?? this.cadence,
         elevationGainM: elevationGainM ?? this.elevationGainM,
         calories: calories ?? this.calories,
-        trackPoints: trackPoints ?? this.trackPoints,
+        pointCount: pointCount ?? this.pointCount,
       );
 }
 
@@ -76,6 +76,9 @@ class TrackingModel extends Notifier<TrackingState> {
   // Serial command queue — prevents start/stop/pause race conditions during
   // rapid pause/resume cycles (blueprint: "lock start/stop commands").
   Future<void>? _lock;
+
+  /// Expose raw points for the map without copying the full list every tick.
+  List<TrackPoint> get points => _pts;
 
   @override
   TrackingState build() {
@@ -114,9 +117,8 @@ class TrackingModel extends Notifier<TrackingState> {
     if (_runStart != null) {
       _accumulatedMs += DateTime.now().difference(_runStart!).inMilliseconds;
       _runStart = null;
-      if (!isPaused && _pts.isNotEmpty && _pts.last.speedMps > 0.3) {
-        _accumulatedMovingMs = state.movingTimeMs;
-      }
+      // Persist current moving time before clearing the moving timer
+      _accumulatedMovingMs = state.movingTimeMs;
       _movingStart = null;
     }
   }
@@ -208,7 +210,7 @@ class TrackingModel extends Notifier<TrackingState> {
         elapsedMs: (j['elapsedMs'] as num?)?.toInt() ?? 0,
         movingTimeMs: (j['movingTimeMs'] as num?)?.toInt() ?? 0,
         elevationGainM: _elevationGain,
-        trackPoints: [..._pts],
+        pointCount: _pts.length,
       );
     } catch (_) {
       // corrupt snapshot — ignore
@@ -226,8 +228,8 @@ class TrackingModel extends Notifier<TrackingState> {
         _sub?.cancel();
         _sub = _engine.startRecording().listen(_onPoint);
         _startTicker();
-        // If recovered run had no moving time recorded, start tracking it now
-        if (_movingStart == null && _accumulatedMovingMs == 0) {
+        // If the last recovered point was moving, resume moving time tracking
+        if (_pts.isNotEmpty && _pts.last.speedMps > 0.3) {
           _movingStart = DateTime.now();
         }
         state = state.copyWith(state: AppEngineState.recording);
@@ -249,7 +251,7 @@ class TrackingModel extends Notifier<TrackingState> {
       cadence: null,
       elevationGainM: 0,
       calories: 0,
-      trackPoints: const [],
+      pointCount: 0,
     );
     _startTicker();
     _sub?.cancel();
@@ -260,53 +262,28 @@ class TrackingModel extends Notifier<TrackingState> {
     _pts.add(p);
     final isMoving = p.speedMps > 0.3;
     
-    // Track moving time: start timer if speed > 0.3, accumulate when we have speed
+    // Track moving time: start timer if speed > 0.3 m/s
     if (isMoving && _movingStart == null) {
       _movingStart = DateTime.now();
     }
     
     if (_pts.length == 1) {
-      if (isMoving) {
-        _movingStart = DateTime.now();
-        state = state.copyWith(
-          state: AppEngineState.recording,
-          paceMinPerKm: 1000 / (p.speedMps * 60),
-          heartRate: p.heartRate,
-          cadence: p.cadence,
-          elevationGainM: 0,
-          calories: 0,
-          movingTimeMs: 1000,
-          trackPoints: [_pts.first],
-        );
-      } else {
-        state = state.copyWith(
-          state: AppEngineState.recording,
-          paceMinPerKm: 0.0,
-          heartRate: p.heartRate,
-          cadence: p.cadence,
-          elevationGainM: 0,
-          calories: 0,
-          movingTimeMs: 0,
-          trackPoints: [_pts.first],
-        );
-      }
+      state = state.copyWith(
+        state: AppEngineState.recording,
+        paceMinPerKm: p.speedMps > 0.3 ? 1000 / (p.speedMps * 60) : 0.0,
+        heartRate: p.heartRate,
+        cadence: p.cadence,
+        elevationGainM: 0,
+        calories: 0,
+        pointCount: 1,
+      );
       return;
     }
     final prev = _pts[_pts.length - 2];
     final d = _haversine(prev.lat, prev.lng, p.lat, p.lng);
     final gained = (p.elevation - prev.elevation);
     if (gained > 0) _elevationGain += gained;
-    final pace = isMoving ? 1000 / (p.speedMps * 60) : 0.0;
-    
-    // Accumulate moving time if currently moving
-    int movingMs = state.movingTimeMs;
-    if (isMoving && _movingStart != null) {
-      movingMs += 1000; // 1 second per point (rough estimate)
-    } else if (!isMoving && _movingStart != null) {
-      // When we stop moving, accumulate and reset the moving timer
-      movingMs += DateTime.now().difference(_movingStart!).inMilliseconds;
-      _movingStart = null;
-    }
+    final pace = p.speedMps > 0.3 ? 1000 / (p.speedMps * 60) : 0.0;
     
     final calories = (state.elapsedMs / 60000 * 11).round();
     state = state.copyWith(
@@ -317,8 +294,7 @@ class TrackingModel extends Notifier<TrackingState> {
       cadence: p.cadence,
       elevationGainM: _elevationGain,
       calories: calories,
-      movingTimeMs: movingMs,
-      trackPoints: [..._pts],
+      pointCount: _pts.length,
     );
     // Throttled recovery snapshot (every 10 points keeps the file small).
     if (_pts.length % 10 == 0) _writeRecovery();

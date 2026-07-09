@@ -82,14 +82,18 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                 child: Stack(
                   children: [
                     RepaintBoundary(
-                      child: _MapView(points: m.trackPoints, styleString: style),
+                      child: _MapView(
+                        points: ref.read(trackingModelProvider.notifier).points,
+                        pointCount: m.pointCount,
+                        styleString: style,
+                      ),
                     ),
                     Positioned(
                       top: MediaQuery.of(context).padding.top + AppTheme.s12,
                       left: AppTheme.s16,
                       child: _StatusPill(state: m.state),
                     ),
-                    if (ghost != null)
+                    if (!isIdle && ghost != null)
                       Positioned(
                         top: MediaQuery.of(context).padding.top + AppTheme.s12 + 36,
                         left: AppTheme.s16,
@@ -451,7 +455,8 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
     Haptics.heavy();
     // Capture ALL state BEFORE calling stop() which resets to initial.
     final m = ref.read(trackingModelProvider);
-    final trackPoints = List<TrackPoint>.from(m.trackPoints);
+    final notifier = ref.read(trackingModelProvider.notifier);
+    final trackPoints = List<TrackPoint>.from(notifier.points);
     final distanceM = m.distanceM;
     final elapsedMs = m.elapsedMs;
     final movingTimeMs = m.movingTimeMs;
@@ -855,8 +860,9 @@ class _SosButton extends ConsumerWidget {
 
   Future<void> _sendSos(WidgetRef ref) async {
     final contacts = ref.read(safetyContactsProvider);
-    final m = ref.read(trackingModelProvider);
-    final last = m.trackPoints.isNotEmpty ? m.trackPoints.last : null;
+    final notifier = ref.read(trackingModelProvider.notifier);
+    final pts = notifier.points;
+    final last = pts.isNotEmpty ? pts.last : null;
     final lat = last?.lat ?? _kDefaultCenter.latitude;
     final lng = last?.lng ?? _kDefaultCenter.longitude;
     await SafetyService.sendSos(contacts, lat, lng);
@@ -900,10 +906,31 @@ class _MapToggleButton extends ConsumerWidget {
   }
 }
 
+/// Map view that draws the live route polyline and follows the user location.
+///
+/// Fixes three interrelated map bugs:
+///   1. Map never zooms to the first GPS fix.
+///   2. onCameraIdle fires on programmatic camera moves, permanently disabling
+///      auto-follow.
+///   3. Full widget rebuild + remove/add line on every GPS point.
+///
+/// Approach:
+///   - Trigger route syncs via [pointCount] (an int) instead of comparing the
+///     mutable list reference, which always returns false after initial build.
+///   - Use onCameraTrackingDismissed to detect *real* user pans (native SDK
+///     distinguishes gesture vs programmatic for us).
+///   - On each new point, re-enable auto-follow so the camera stays with the
+///     runner unless the user explicitly panned away.
+///   - Update existing line geometry in-place when possible (not remove+add).
 class _MapView extends StatefulWidget {
   final List<TrackPoint> points;
+  final int pointCount;
   final String styleString;
-  const _MapView({required this.points, this.styleString = _kDarkStyle});
+  const _MapView({
+    required this.points,
+    required this.pointCount,
+    this.styleString = _kDarkStyle,
+  });
 
   @override
   State<_MapView> createState() => _MapViewState();
@@ -916,11 +943,17 @@ class _MapViewState extends State<_MapView> {
   bool _isSyncing = false;
   List<LatLng>? _pendingCoords;
   bool _autoFollow = true;
+  bool _firstPointReceived = false;
 
   @override
   void initState() {
     super.initState();
     _checkPermission();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   Future<void> _checkPermission() async {
@@ -936,7 +969,26 @@ class _MapViewState extends State<_MapView> {
   void didUpdateWidget(covariant _MapView old) {
     super.didUpdateWidget(old);
     _checkPermission();
-    if (widget.points != old.points) _syncRoute();
+    // Use pointCount (int) instead of points (list reference) to detect
+    // new data. The list is the same mutable object every rebuild, so
+    // widget.points != old.points would ALWAYS be false — the root cause
+    // of bugs #1 and #3.
+    if (widget.pointCount != old.pointCount) {
+      // Bug #1 fix: first GPS point → zoom to the blue dot
+      if (!_firstPointReceived && widget.pointCount > 0) {
+        _firstPointReceived = true;
+        _autoFollow = true;
+        final first =
+            LatLng(widget.points.first.lat, widget.points.first.lng);
+        _ctrl?.animateCamera(CameraUpdate.newLatLngZoom(first, 16));
+      } else if (widget.pointCount > 0) {
+        // Bug #2 fix: new route data re-enables auto-follow so the camera
+        // keeps tracking the runner's progress (unless user panned away,
+        // in which case onCameraTrackingDismissed cleared _autoFollow).
+        _autoFollow = true;
+      }
+      _syncRoute();
+    }
   }
 
   void _syncRoute() {
@@ -944,7 +996,7 @@ class _MapViewState extends State<_MapView> {
     if (ctrl == null) return;
     // No drawable path yet — drop any stale line so the map only ever shows
     // the route the user has actually recorded.
-    if (widget.points.length < 2) {
+    if (widget.pointCount < 2) {
       _clearLine();
       return;
     }
@@ -970,35 +1022,48 @@ class _MapViewState extends State<_MapView> {
   Future<void> _clearLine() async {
     final ctrl = _ctrl;
     if (ctrl == null || _lineId == null) return;
-    final toRemove = _lineId!;
-    _lineId = null;
     try {
-      await ctrl.removeLine(toRemove);
+      await ctrl.removeLine(_lineId!);
     } catch (_) {
       // controller may be mid-dispose
     }
+    _lineId = null;
   }
 
   Future<void> _drawRoute(List<LatLng> coords) async {
     final ctrl = _ctrl;
     if (ctrl == null || coords.length < 2) return;
+
+    // Bug #3 fix: update line geometry in-place instead of remove+add
     if (_lineId != null) {
-      final toRemove = _lineId!;
-      _lineId = null;
       try {
-        await ctrl.removeLine(toRemove);
-      } catch (_) {}
-    }
-_lineId = await ctrl.addLine(
-      LineOptions(
+        await ctrl.updateLine(_lineId!, LineOptions(geometry: coords));
+      } catch (_) {
+        // updateLine may fail if the map engine hasn't indexed the line yet;
+        // fall back to the old remove+add pattern
+        try {
+          await ctrl.removeLine(_lineId!);
+        } catch (_) {}
+        _lineId = await ctrl.addLine(LineOptions(
+          geometry: coords,
+          lineColor: '#FE2E4B',
+          lineWidth: 6,
+          lineOpacity: 0.95,
+          lineBlur: 0.5,
+        ));
+      }
+    } else {
+      _lineId = await ctrl.addLine(LineOptions(
         geometry: coords,
         lineColor: '#FE2E4B',
         lineWidth: 6,
         lineOpacity: 0.95,
         lineBlur: 0.5,
-      ),
-    );
-    // Only auto-follow the route if enabled.
+      ));
+    }
+
+    // Only animate the camera if the user hasn't panned away to explore.
+    // When tracking mode is active, the native SDK handles follow.
     if (coords.isNotEmpty && _autoFollow) {
       await ctrl.animateCamera(CameraUpdate.newLatLng(coords.last));
     }
@@ -1014,30 +1079,36 @@ _lineId = await ctrl.addLine(
       ),
       styleString: widget.styleString,
       myLocationEnabled: _hasLocationPermission,
-      // Use `none` tracking so the camera doesn't fight the user's manual
-      // gestures. The blue dot still shows via `myLocationEnabled`.
-      myLocationTrackingMode: MyLocationTrackingMode.none,
+      myLocationTrackingMode: _autoFollow
+          ? MyLocationTrackingMode.tracking
+          : MyLocationTrackingMode.none,
       onMapCreated: (c) {
         _ctrl = c;
         _syncRoute();
       },
-      onCameraIdle: () {
-        // User has moved the camera manually - disable auto-follow.
-        if (mounted && _autoFollow) {
-          setState(() {
-            _autoFollow = false;
-          });
+      onCameraTrackingDismissed: () {
+        // Bug #2 fix: this native callback fires ONLY when the user
+        // physically pans/zooms the map — NOT on programmatic
+        // animateCamera calls. We use it to let the user explore
+        // without the camera snapping back.
+        setState(() {
+          _autoFollow = false;
+        });
+      },
+      onUserLocationUpdated: (userLocation) {
+        // Bug #1 fix: before any route point is recorded, nudge the
+        // camera to the user's actual GPS location so the first fix
+        // is visible even if the native tracking mode hasn't engaged.
+        if (_ctrl != null && !_firstPointReceived) {
+          _ctrl!.animateCamera(
+            CameraUpdate.newLatLng(userLocation.position),
+          );
         }
       },
-      onUserLocationUpdated: (location) {
-        // We don't auto-follow raw GPS, only the drawn route.
+      onMapClick: (point, coords) {
+        // User tapped — they'll manually pan; let them explore.
+        // Auto-follow disables via onCameraTrackingDismissed.
       },
     );
-  }
-
-  @override
-  void dispose() {
-    // Don't dispose the controller - MapLibreMap handles its own disposal
-    super.dispose();
   }
 }

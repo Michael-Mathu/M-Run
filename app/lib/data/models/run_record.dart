@@ -18,6 +18,7 @@ class RunRecord {
   final int calories;
   final double elevationGainM;
   final int avgHeartRate;
+  final int avgCadence;
   final List<LatLng> route;
   final List<double> elevation; // m, per sampled point
   final List<double> pace; // min/km, per sampled point
@@ -32,6 +33,7 @@ class RunRecord {
     required this.calories,
     required this.elevationGainM,
     required this.avgHeartRate,
+    required this.avgCadence,
     required this.route,
     required this.elevation,
     required this.pace,
@@ -50,6 +52,7 @@ class RunRecord {
         calories: j['calories'] ?? 0,
         elevationGainM: (j['elevationGainM'] ?? 0).toDouble(),
         avgHeartRate: j['avgHeartRate'] ?? 0,
+        avgCadence: j['avgCadence'] ?? 0,
         route: (j['route'] as List)
             .map((p) => LatLng((p[0] as num).toDouble(), (p[1] as num).toDouble()))
             .toList(),
@@ -67,6 +70,7 @@ class RunRecord {
         'calories': calories,
         'elevationGainM': elevationGainM,
         'avgHeartRate': avgHeartRate,
+        'avgCadence': avgCadence,
         'route': route.map((p) => [p.latitude, p.longitude]).toList(),
         'elevation': elevation,
         'pace': pace,
@@ -81,6 +85,7 @@ class RunRecord {
         calories: calories,
         elevationGainM: elevationGainM,
         avgHeartRate: avgHeartRate,
+        avgCadence: avgCadence,
         route: route,
         elevation: elevation,
         pace: pace,
@@ -96,6 +101,9 @@ RunRecord runRecordFromSession({
   required int durationMs,
   required double elevationGainM,
   required int calories,
+  int? avgHeartRate,
+  int avgCadence = 0,
+  int movingTimeMs = 0,
   String type = 'Run',
 }) {
   final route = <LatLng>[];
@@ -121,10 +129,11 @@ RunRecord runRecordFromSession({
     startedAt: startedAt,
     distanceM: distanceM,
     durationMs: durationMs,
-    movingTimeMs: durationMs,
+    movingTimeMs: movingTimeMs > 0 ? movingTimeMs : durationMs,
     calories: calories,
     elevationGainM: elevationGainM,
-    avgHeartRate: hrCount > 0 ? (hrSum / hrCount).round() : 0,
+    avgHeartRate: avgHeartRate ?? (hrCount > 0 ? (hrSum / hrCount).round() : 0),
+    avgCadence: avgCadence,
     route: route,
     elevation: elevation,
     pace: pace,

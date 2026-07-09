@@ -12,6 +12,7 @@ class SampleActivity {
   final int calories;
   final double elevationGainM;
   final int avgHeartRate;
+  final int avgCadence;
   final List<LatLng> route;
   final List<double> elevation; // metres, per sampled point
   final List<double> pace; // min/km, per sampled point
@@ -25,6 +26,7 @@ class SampleActivity {
     required this.calories,
     required this.elevationGainM,
     required this.avgHeartRate,
+    required this.avgCadence,
     required this.route,
     required this.elevation,
     required this.pace,
@@ -76,6 +78,7 @@ class SampleActivity {
       calories: calories,
       elevationGainM: elevationGainM,
       avgHeartRate: avgHeartRate,
+      avgCadence: 170 + rnd.nextInt(15),
       route: route,
       elevation: elevation,
       pace: pace,

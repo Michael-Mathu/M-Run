@@ -13,6 +13,7 @@ class TrackingState {
   final AppEngineState state;
   final double distanceM;
   final int elapsedMs;
+  final int movingTimeMs;
   final double paceMinPerKm; // 0 = unknown
   final int? heartRate;
   final int? cadence;
@@ -24,6 +25,7 @@ class TrackingState {
     required this.state,
     this.distanceM = 0,
     this.elapsedMs = 0,
+    this.movingTimeMs = 0,
     this.paceMinPerKm = 0,
     this.heartRate,
     this.cadence,
@@ -38,6 +40,7 @@ class TrackingState {
     AppEngineState? state,
     double? distanceM,
     int? elapsedMs,
+    int? movingTimeMs,
     double? paceMinPerKm,
     int? heartRate,
     int? cadence,
@@ -49,6 +52,7 @@ class TrackingState {
         state: state ?? this.state,
         distanceM: distanceM ?? this.distanceM,
         elapsedMs: elapsedMs ?? this.elapsedMs,
+        movingTimeMs: movingTimeMs ?? this.movingTimeMs,
         paceMinPerKm: paceMinPerKm ?? this.paceMinPerKm,
         heartRate: heartRate ?? this.heartRate,
         cadence: cadence ?? this.cadence,
@@ -65,6 +69,8 @@ class TrackingModel extends Notifier<TrackingState> {
   Timer? _ticker;
   DateTime? _runStart;
   int _accumulatedMs = 0;
+  int _accumulatedMovingMs = 0;
+  DateTime? _movingStart;
   StreamSubscription<TrackPoint>? _sub;
 
   // Serial command queue — prevents start/stop/pause race conditions during
@@ -86,19 +92,32 @@ class TrackingModel extends Notifier<TrackingState> {
       if (_runStart == null) return;
       final total =
           _accumulatedMs + DateTime.now().difference(_runStart!).inMilliseconds;
+      // Moving time only counts when speed > 0.3 m/s
+      int movingMs = _accumulatedMovingMs;
+      if (_movingStart != null && _pts.isNotEmpty) {
+        final lastSpeed = _pts.last.speedMps;
+        if (lastSpeed > 0.3) {
+          movingMs += DateTime.now().difference(_movingStart!).inMilliseconds;
+        }
+      }
       state = state.copyWith(
         elapsedMs: total,
+        movingTimeMs: movingMs,
         calories: (total / 60000 * 11).round(),
       );
     });
   }
 
-  void _stopTicker() {
+  void _stopTicker({bool isPaused = false}) {
     _ticker?.cancel();
     _ticker = null;
     if (_runStart != null) {
       _accumulatedMs += DateTime.now().difference(_runStart!).inMilliseconds;
       _runStart = null;
+      if (!isPaused && _pts.isNotEmpty && _pts.last.speedMps > 0.3) {
+        _accumulatedMovingMs = state.movingTimeMs;
+      }
+      _movingStart = null;
     }
   }
 
@@ -126,6 +145,7 @@ class TrackingModel extends Notifier<TrackingState> {
       await _recoveryFile().writeAsString(jsonEncode({
         'distanceM': state.distanceM,
         'elapsedMs': state.elapsedMs,
+        'movingTimeMs': state.movingTimeMs,
         'elevationGainM': _elevationGain,
         'points': data,
       }));
@@ -138,7 +158,10 @@ class TrackingModel extends Notifier<TrackingState> {
     try {
       final f = _recoveryFile();
       if (await f.exists()) await f.delete();
-    } catch (_) {}
+    } catch (e) {
+      // Log but don't crash - recovery file may be locked by antivirus/etc.
+      // Will be cleaned up on next successful run.
+    }
   }
 
   /// True if a previously interrupted run was found on disk.
@@ -154,7 +177,7 @@ class TrackingModel extends Notifier<TrackingState> {
     }
   }
 
-  /// Load an interrupted run from disk and resume it in a `recovering` state.
+/// Load an interrupted run from disk and resume it in a `recovering` state.
   Future<void> restoreInterrupted() async {
     try {
       final f = _recoveryFile();
@@ -162,26 +185,28 @@ class TrackingModel extends Notifier<TrackingState> {
       final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
       final pts = (j['points'] as List)
               .map((e) => TrackPoint(
-                lat: (e['lat'] as num).toDouble(),
-                lng: (e['lng'] as num).toDouble(),
-                elevation: (e['elevation'] as num).toDouble(),
-                timestamp: DateTime.parse(e['timestamp'] as String),
-                speedMps: (e['speed'] as num).toDouble(),
-                heartRate: e['hr'] as int?,
-                cadence: e['cadence'] as int?,
-                accuracy: (e['accuracy'] as num?)?.toInt() ?? 0,
-                state: 'run',
-              ))
-          .toList();
+                    lat: (e['lat'] as num).toDouble(),
+                    lng: (e['lng'] as num).toDouble(),
+                    elevation: (e['elevation'] as num).toDouble(),
+                    timestamp: DateTime.parse(e['timestamp'] as String),
+                    speedMps: (e['speed'] as num).toDouble(),
+                    heartRate: e['hr'] as int?,
+                    cadence: e['cadence'] as int?,
+                    accuracy: (e['accuracy'] as num?)?.toInt() ?? 0,
+                    state: 'run',
+                  ))
+              .toList();
       _pts
         ..clear()
         ..addAll(pts);
       _elevationGain = (j['elevationGainM'] as num?)?.toDouble() ?? 0;
       _accumulatedMs = (j['elapsedMs'] as num?)?.toInt() ?? 0;
+      _accumulatedMovingMs = (j['movingTimeMs'] as num?)?.toInt() ?? 0;
       state = state.copyWith(
         state: AppEngineState.recovering,
         distanceM: (j['distanceM'] as num?)?.toDouble() ?? 0,
         elapsedMs: (j['elapsedMs'] as num?)?.toInt() ?? 0,
+        movingTimeMs: (j['movingTimeMs'] as num?)?.toInt() ?? 0,
         elevationGainM: _elevationGain,
         trackPoints: [..._pts],
       );
@@ -201,6 +226,10 @@ class TrackingModel extends Notifier<TrackingState> {
         _sub?.cancel();
         _sub = _engine.startRecording().listen(_onPoint);
         _startTicker();
+        // If recovered run had no moving time recorded, start tracking it now
+        if (_movingStart == null && _accumulatedMovingMs == 0) {
+          _movingStart = DateTime.now();
+        }
         state = state.copyWith(state: AppEngineState.recording);
         return;
       }
@@ -208,10 +237,13 @@ class TrackingModel extends Notifier<TrackingState> {
     _pts.clear();
     _elevationGain = 0;
     _accumulatedMs = 0;
+    _accumulatedMovingMs = 0;
+    _movingStart = null;
     state = state.copyWith(
       state: AppEngineState.recording,
       distanceM: 0,
       elapsedMs: 0,
+      movingTimeMs: 0,
       paceMinPerKm: 0,
       heartRate: null,
       cadence: null,
@@ -226,23 +258,56 @@ class TrackingModel extends Notifier<TrackingState> {
 
   void _onPoint(TrackPoint p) {
     _pts.add(p);
+    final isMoving = p.speedMps > 0.3;
+    
+    // Track moving time: start timer if speed > 0.3, accumulate when we have speed
+    if (isMoving && _movingStart == null) {
+      _movingStart = DateTime.now();
+    }
+    
     if (_pts.length == 1) {
-      state = state.copyWith(
-        state: AppEngineState.recording,
-        paceMinPerKm: p.speedMps > 0.3 ? 1000 / (p.speedMps * 60) : 0.0,
-        heartRate: p.heartRate,
-        cadence: p.cadence,
-        elevationGainM: 0,
-        calories: 0,
-        trackPoints: [_pts.first],
-      );
+      if (isMoving) {
+        _movingStart = DateTime.now();
+        state = state.copyWith(
+          state: AppEngineState.recording,
+          paceMinPerKm: 1000 / (p.speedMps * 60),
+          heartRate: p.heartRate,
+          cadence: p.cadence,
+          elevationGainM: 0,
+          calories: 0,
+          movingTimeMs: 1000,
+          trackPoints: [_pts.first],
+        );
+      } else {
+        state = state.copyWith(
+          state: AppEngineState.recording,
+          paceMinPerKm: 0.0,
+          heartRate: p.heartRate,
+          cadence: p.cadence,
+          elevationGainM: 0,
+          calories: 0,
+          movingTimeMs: 0,
+          trackPoints: [_pts.first],
+        );
+      }
       return;
     }
     final prev = _pts[_pts.length - 2];
     final d = _haversine(prev.lat, prev.lng, p.lat, p.lng);
     final gained = (p.elevation - prev.elevation);
     if (gained > 0) _elevationGain += gained;
-    final pace = p.speedMps > 0.3 ? 1000 / (p.speedMps * 60) : 0.0;
+    final pace = isMoving ? 1000 / (p.speedMps * 60) : 0.0;
+    
+    // Accumulate moving time if currently moving
+    int movingMs = state.movingTimeMs;
+    if (isMoving && _movingStart != null) {
+      movingMs += 1000; // 1 second per point (rough estimate)
+    } else if (!isMoving && _movingStart != null) {
+      // When we stop moving, accumulate and reset the moving timer
+      movingMs += DateTime.now().difference(_movingStart!).inMilliseconds;
+      _movingStart = null;
+    }
+    
     final calories = (state.elapsedMs / 60000 * 11).round();
     state = state.copyWith(
       state: AppEngineState.recording,
@@ -252,6 +317,7 @@ class TrackingModel extends Notifier<TrackingState> {
       cadence: p.cadence,
       elevationGainM: _elevationGain,
       calories: calories,
+      movingTimeMs: movingMs,
       trackPoints: [..._pts],
     );
     // Throttled recovery snapshot (every 10 points keeps the file small).
@@ -260,7 +326,7 @@ class TrackingModel extends Notifier<TrackingState> {
 
   void pause() => _enqueue(() async {
         _engine.pause();
-        _stopTicker();
+        _stopTicker(isPaused: true);
         await _writeRecovery();
         state = state.copyWith(state: AppEngineState.paused);
       });

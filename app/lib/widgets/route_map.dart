@@ -48,12 +48,7 @@ class _RouteMapView extends StatefulWidget {
 class _RouteMapState extends State<_RouteMapView> {
   MapLibreMapController? _ctrl;
   Line? _line;
-
-  @override
-  void didUpdateWidget(covariant _RouteMapView old) {
-    super.didUpdateWidget(old);
-    if (widget.points != old.points) _syncRoute();
-  }
+  bool _autoFollow = true;
 
   void _syncRoute() {
     final ctrl = _ctrl;
@@ -81,7 +76,9 @@ class _RouteMapState extends State<_RouteMapView> {
         .then((line) => _line = line);
     // Keep the current zoom (don't re-zoom to the default on every rebuild);
     // just recenter on the route's end.
-    ctrl.animateCamera(CameraUpdate.newLatLng(widget.points.last));
+    if (_autoFollow) {
+      ctrl.animateCamera(CameraUpdate.newLatLng(widget.points.last));
+    }
   }
 
   @override
@@ -120,7 +117,7 @@ class _RouteMapState extends State<_RouteMapView> {
 
   @override
   void dispose() {
-    _ctrl?.dispose();
+    // Let MapLibreMap handle controller disposal
     super.dispose();
   }
 }

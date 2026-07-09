@@ -32,27 +32,26 @@ class Gamification extends Notifier<GamificationState> {
     return const GamificationState();
   }
 
+  void _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      final raw = prefs.getString(_key);
+      if (raw != null) {
+        state = GamificationState.fromJson(jsonDecode(raw));
+      }
+    } catch (_) {
+      // Corrupt save — reset to a clean default instead of crashing.
+      state = const GamificationState();
+      ref.read(gamificationCorruptedProvider.notifier).flag();
+      prefs.remove(_key);
+    }
+  }
+
   void _startAutosave() {
     // ponytail: periodic autosave (every 2 min) so a crash between mutating
     // state and the explicit _persist() can't lose more than a couple minutes.
     _autosaveTimer?.cancel();
     _autosaveTimer = Timer.periodic(const Duration(minutes: 2), (_) => _persist());
-  }
-
-  void _load() {
-    SharedPreferences.getInstance().then((prefs) {
-      try {
-        final raw = prefs.getString(_key);
-        if (raw != null) {
-          state = GamificationState.fromJson(jsonDecode(raw));
-        }
-      } catch (_) {
-        // Corrupt save — reset to a clean default instead of crashing.
-        state = const GamificationState();
-        ref.read(gamificationCorruptedProvider.notifier).flag();
-        prefs.remove(_key);
-      }
-    });
   }
 
   Future<void> _persist() async {

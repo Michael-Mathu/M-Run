@@ -454,8 +454,19 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
     final trackPoints = List<TrackPoint>.from(m.trackPoints);
     final distanceM = m.distanceM;
     final elapsedMs = m.elapsedMs;
+    final movingTimeMs = m.movingTimeMs;
     final elevationGainM = m.elevationGainM;
     final calories = m.calories;
+    final heartRate = m.heartRate;
+    // Calculate average cadence from trackpoints
+    int cadenceSum = 0, cadenceCount = 0;
+    for (final p in trackPoints) {
+      if (p.cadence != null) {
+        cadenceSum += p.cadence!;
+        cadenceCount++;
+      }
+    }
+    final avgCadence = cadenceCount > 0 ? (cadenceSum / cadenceCount).round() : 0;
     final ghost = ref.read(ghostTargetProvider);
 
     await ref.read(trackingModelProvider.notifier).stop();
@@ -471,9 +482,16 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
       durationMs: elapsedMs,
       elevationGainM: elevationGainM,
       calories: calories,
+      movingTimeMs: movingTimeMs,
+      avgHeartRate: heartRate,
+      avgCadence: avgCadence,
     );
-    await ref.read(activityRepositoryProvider.future).then((repo) => repo.save(record));
+    final repo = await ref.read(activityRepositoryProvider.future);
+    await repo.save(record);
+    // Invalidate repository to force all dependent providers to re-read
+    ref.invalidate(activityRepositoryProvider);
     ref.invalidate(activitiesProvider);
+    ref.invalidate(activityByIdProvider);
 
     final userAvgPace = distanceM > 0
         ? (elapsedMs / 60000) / (distanceM / 1000)
@@ -897,7 +915,7 @@ class _MapViewState extends State<_MapView> {
   bool _hasLocationPermission = false;
   bool _isSyncing = false;
   List<LatLng>? _pendingCoords;
-  bool _userInteracted = false;
+  bool _autoFollow = true;
 
   @override
   void initState() {
@@ -971,7 +989,7 @@ class _MapViewState extends State<_MapView> {
         await ctrl.removeLine(toRemove);
       } catch (_) {}
     }
-    _lineId = await ctrl.addLine(
+_lineId = await ctrl.addLine(
       LineOptions(
         geometry: coords,
         lineColor: '#FE2E4B',
@@ -980,9 +998,8 @@ class _MapViewState extends State<_MapView> {
         lineBlur: 0.5,
       ),
     );
-    // Only auto-follow the route if the user hasn't manually panned/zoomed.
-    // Once the user interacts with the map, we stop overriding the camera.
-    if (coords.isNotEmpty && !_userInteracted) {
+    // Only auto-follow the route if enabled.
+    if (coords.isNotEmpty && _autoFollow) {
       await ctrl.animateCamera(CameraUpdate.newLatLng(coords.last));
     }
   }
@@ -1005,8 +1022,12 @@ class _MapViewState extends State<_MapView> {
         _syncRoute();
       },
       onCameraIdle: () {
-        // User has moved the camera manually - stop auto-following.
-        _userInteracted = true;
+        // User has moved the camera manually - disable auto-follow.
+        if (mounted && _autoFollow) {
+          setState(() {
+            _autoFollow = false;
+          });
+        }
       },
       onUserLocationUpdated: (location) {
         // We don't auto-follow raw GPS, only the drawn route.
@@ -1016,7 +1037,7 @@ class _MapViewState extends State<_MapView> {
 
   @override
   void dispose() {
-    _ctrl?.dispose();
+    // Don't dispose the controller - MapLibreMap handles its own disposal
     super.dispose();
   }
 }

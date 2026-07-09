@@ -13,7 +13,17 @@ class MethodChannelMwendoGpsEngine extends MwendoGpsEnginePlatform {
   final _trackpointController = StreamController<TrackPoint>.broadcast();
 
   MethodChannelMwendoGpsEngine() {
-    _eventChannel.receiveBroadcastStream().listen(_onTrackpointEvent);
+    _eventChannel.receiveBroadcastStream().listen(
+      _onTrackpointEvent,
+      onError: _onEngineError,
+    );
+  }
+
+  void _onEngineError(dynamic error) {
+    // Native-side failures (e.g. foreground start rejected) arrive here.
+    // Log rather than crash; the run simply receives no points.
+    // ignore: avoid_print
+    print('MwendoGpsEngine event error: $error');
   }
 
   void _onTrackpointEvent(dynamic event) {

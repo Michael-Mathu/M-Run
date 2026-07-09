@@ -2,6 +2,13 @@ The debug APK has been built and is available at:
 
 `mwendo/app/build/app/outputs/flutter-apk/app-debug.apk`
 
+> **Update (2026-07-09):** the run-sequence crash and the non-functional manual
+> zoom described below have been **diagnosed and fixed** in
+> `docs/diagnostic_report.md` (C1–C4 + Z1) and the fixes are implemented.
+> The remaining value of this guide is confirming the fixes on a real device and
+> catching any device-specific crash the static analysis couldn't (e.g. a
+> different foreground-service / OEM quirk).
+
 ## Why the crash needs crash logs to diagnose
 
 Without actual crash logs (e.g. `adb logcat`, crashlytics, or stack traces), it's impossible to pinpoint why "Begin Run" fails — the symptom could be a permission-denied `SecurityException`, an EventChannel registration error, an engine re-registration race, a notified permission crash, or any number of runtime issues.
@@ -48,7 +55,6 @@ Tap the button, then paste the entire log block into a reply. Expect to see anyt
 
 - **ERROR/AndroidRuntime (SecurityException)** — often from `ServiceCompat.startForeground()` (missing POST_NOTIFICATIONS)
 - **java.lang.IllegalStateException** — EventChannel listen onCancel without proper cleanup
-- **StateError** — offlineMapProvider trying to init a bundle when none exists and catching only `StateError` (should catch `Exception`)
 - **DriverDisconnectedException** / **Asynchronous error** — MethodChannel issues with the native plugin
 - **FlutterError** — null instances (e.g., `service?.pause()`), or timing bugs in the engine methods.
 
@@ -77,18 +83,12 @@ From the audit/Kilo fixes just applied, the most likely runtime culprits are:
    }
    ```
 
-3. **Offline-map crash on boot without bundle** — `offlineMapProvider` catches only `StateError`. A
-   corrupt or unsupported MBTiles/PMTiles bundle throws another exception (e.g. `FormatException`,
-   `sqlite3.FFI` error), which propagates to the UI and crashes the map view. **Fix** (just applied):
-   ```dart
-   try {
-     return await OfflineMapController.init();
-   } on StateError {
-     return null;
-   } on Exception {
-     return null;  // catch any other init failure
-   }
-   ```
+3. **Offline-map tile server (removed)** — the app previously shipped a custom loopback tile
+   server (`offline_map_provider.dart`) that parsed MBTiles/PMTiles bundles. It ran synchronous
+   I/O on the UI thread, defaulted to offline even with no bundle present, and destroyed the map
+   widget on toggle. This whole subsystem has been **deleted**; the app now uses the online Carto
+   dark style via the shared `MwendoMap` widget, so these crash vectors no longer exist. (Offline
+   maps will return later via MapLibre's built-in offline regions API.)
 
 4. **GPS permission timing** — The Dart `TrackingModel._start()` calls `_engine.startRecording()`
    before Dart knows if notification permission was granted. If the user denies, the native
@@ -115,4 +115,4 @@ From the audit/Kilo fixes just applied, the most likely runtime culprits are:
 the previous screen, capture those logs immediately.
 
 Once you provide the crash logs, I can pinpoint the exact line and surrounding code that
-needs fixing — likely a permission race, EventChannel orphaning, or the offline-map catcher.
+needs fixing — likely a permission race or EventChannel orphaning.

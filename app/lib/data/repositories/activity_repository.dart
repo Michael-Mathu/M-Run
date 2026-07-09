@@ -17,14 +17,14 @@ class ActivityRepository {
 
   Future<List<RunRecord>> list() async {
     try {
-      if (!await _file.exists()) return const [];
+      if (!await _file.exists()) return [];
       final raw = await _file.readAsString();
       final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
       final runs = list.map(RunRecord.fromJson).toList();
       runs.sort((a, b) => b.startedAt.compareTo(a.startedAt));
       return runs;
     } catch (_) {
-      return const [];
+      return [];
     }
   }
 

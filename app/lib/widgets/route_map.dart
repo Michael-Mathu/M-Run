@@ -1,123 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import 'package:mwendo_app/data/maps/offline_map_provider.dart';
+import 'package:mwendo_app/widgets/mwendo_map.dart';
 
-const kDarkStyle =
-    'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-const kDefaultCenter = LatLng(-1.2921, 36.8219); // Nairobi
+// Re-exported so existing imports of route_map.dart keep resolving these.
+export 'package:mwendo_app/widgets/mwendo_map.dart' show kDarkStyle, kDefaultCenter;
 
-/// Dark-styled MapLibre view that draws a live route polyline from [points].
-/// Uses an offline bundle (MBTiles/PMTiles) when one is available, otherwise
-/// the online Carto style.
-class RouteMap extends ConsumerWidget {
+/// Static replay of a finished route, used on the activity detail screen.
+///
+/// This is now a thin wrapper over the shared [MwendoMap] in [MapMode.replay],
+/// so the live tracking map and this replay map share the exact same drawing
+/// and camera logic (and stay in sync). The camera is set once and never
+/// moves; the polyline redraws whenever [points] changes.
+class RouteMap extends StatelessWidget {
   final List<LatLng> points;
-  final String styleString;
   final double zoom;
 
   const RouteMap({
     super.key,
     required this.points,
-    this.styleString = kDarkStyle,
     this.zoom = 14,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final offline = ref.watch(offlineMapProvider).value?.style;
-    final style = offline ?? styleString;
-    return _RouteMapView(points: points, style: style, zoom: zoom);
-  }
-}
-
-class _RouteMapView extends StatefulWidget {
-  final List<LatLng> points;
-  final String style;
-  final double zoom;
-  const _RouteMapView({
-    required this.points,
-    required this.style,
-    required this.zoom,
-  });
-
-  @override
-  State<_RouteMapView> createState() => _RouteMapState();
-}
-
-class _RouteMapState extends State<_RouteMapView> {
-  MapLibreMapController? _ctrl;
-  Line? _line;
-  bool _autoFollow = true;
-
-  void _syncRoute() {
-    final ctrl = _ctrl;
-    if (ctrl == null) return;
-    // Nothing drawable yet — clear any stale line so only the real route shows.
-    if (widget.points.length < 2) {
-      if (_line != null) {
-        final toRemove = _line!;
-        _line = null;
-        ctrl.removeLine(toRemove);
-      }
-      return;
-    }
-    if (_line != null) ctrl.removeLine(_line!);
-    ctrl
-        .addLine(
-          LineOptions(
-            geometry: widget.points,
-            lineColor: '#FE2E4B',
-            lineWidth: 6,
-            lineOpacity: 0.95,
-            lineBlur: 0.4,
-          ),
-        )
-        .then((line) => _line = line);
-    // Keep the current zoom (don't re-zoom to the default on every rebuild);
-    // just recenter on the route's end.
-    if (_autoFollow) {
-      ctrl.animateCamera(CameraUpdate.newLatLng(widget.points.last));
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (widget.points.length < 2) {
-      return Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(0.2, -0.3),
-            radius: 1.4,
-            colors: [Color(0xFF1B2733), Color(0xFF0B0B0C)],
-          ),
-        ),
-        child: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.explore_outlined, size: 40, color: Colors.white24),
-              SizedBox(height: 8),
-              Text('No route recorded', style: TextStyle(color: Colors.white38)),
-            ],
-          ),
-        ),
-      );
-    }
-    return MapLibreMap(
-      initialCameraPosition: CameraPosition(target: widget.points.last, zoom: widget.zoom),
-      styleString: widget.style,
-      myLocationEnabled: false,
-      onMapCreated: (c) {
-        _ctrl = c;
-        _syncRoute();
-      },
+    return MwendoMap(
+      points: points,
+      mode: MapMode.replay,
+      zoom: zoom,
     );
-  }
-
-  @override
-  void dispose() {
-    // Let MapLibreMap handle controller disposal
-    super.dispose();
   }
 }

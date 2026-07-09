@@ -163,7 +163,6 @@ class L10n {
       'sw': 'Maendeleo yako yaliharibika na yamerudishwa.'
     },
     'sos_button': {'en': 'Emergency SOS', 'sw': 'SOS ya Dharura'},
-    'map_toggle': {'en': 'Toggle map source', 'sw': 'Badilisha chanzo cha ramani'},
     'stop_run': {'en': 'Stop run', 'sw': 'Sita mbio'},
     'pause_run': {'en': 'Pause run', 'sw': 'Sitisha mbio'},
     'resume_run': {'en': 'Resume run', 'sw': 'Endelea mbio'},

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'mwendo_gps_engine_method_channel.dart';
 
 enum BatteryProfile { standard, powerSaver, ultraSaver }
 enum EngineState { idle, recording, paused, recovering }
@@ -46,9 +47,12 @@ abstract class MwendoGpsEnginePlatform extends PlatformInterface {
   MwendoGpsEnginePlatform() : super(token: _token);
   static final Object _token = Object();
 
-  static late MwendoGpsEnginePlatform _instance;
+  static MwendoGpsEnginePlatform? _instance;
 
-  static MwendoGpsEnginePlatform get instance => _instance;
+  static MwendoGpsEnginePlatform get instance {
+    _instance ??= MethodChannelMwendoGpsEngine();
+    return _instance!;
+  }
 
   static set instance(MwendoGpsEnginePlatform instance) {
     PlatformInterface.verifyToken(instance, _token);

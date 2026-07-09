@@ -46,6 +46,9 @@ class MwendoTrackingService : Service() {
     private var lastLat = 0.0
     private var lastLng = 0.0
     private var lastTime = 0L
+    // True once the service has successfully entered the foreground. If this
+    // stays false the run must not be treated as recording (see onStartCommand).
+    var foregroundReady = false
 
     inner class LocalBinder : Binder() {
         fun getService(): MwendoTrackingService = this@MwendoTrackingService
@@ -59,7 +62,15 @@ class MwendoTrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startInForeground()
+        foregroundReady = startInForeground()
+        if (!foregroundReady) {
+            // Cannot run as a foreground service (e.g. notification policy).
+            // Tear down immediately so the system never fires
+            // RemoteServiceException for a service that entered foreground mode
+            // but never called startForeground() successfully (C2).
+            stopSelf()
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 
@@ -160,7 +171,7 @@ class MwendoTrackingService : Service() {
         else -> "run"
     }
 
-    private fun startInForeground() {
+    private fun startInForeground(): Boolean {
         val channelId = "mwendo_tracking"
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -188,7 +199,7 @@ class MwendoTrackingService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
-        try {
+        return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ServiceCompat.startForeground(
                     this,
@@ -199,11 +210,14 @@ class MwendoTrackingService : Service() {
             } else {
                 startForeground(1, notification)
             }
-        } catch (e: SecurityException) {
-            // Notification permission denied or background location policy restriction
-            e.printStackTrace()
+            true
         } catch (e: Exception) {
+            // Notification policy / foreground-service type restriction.
+            // Swallowing here used to leave the service un-foregrounded, which
+            // made Android kill it with RemoteServiceException (C2). Callers
+            // must treat a `false` result as a failed start.
             e.printStackTrace()
+            false
         }
     }
 

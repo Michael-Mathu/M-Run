@@ -308,7 +308,7 @@
 |---|---|---|
 | CelebrationOverlay | [celebration_overlay.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/widgets/celebration_overlay.dart) | ✅ Confetti + trophy |
 | LevelRing + XpBar | [level_ring.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/widgets/level_ring.dart) | ✅ |
-| RouteMap | [route_map.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/widgets/route_map.dart) | ⚠️ Uses remote tiles |
+| RouteMap | [route_map.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/widgets/route_map.dart) | ✅ Thin wrapper over shared `MwendoMap` (replay mode) |
 | SectionTitle | [section_title.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/widgets/section_title.dart) | ✅ |
 | SkeletonCard | [skeleton.dart](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/widgets/skeleton.dart) | ✅ Shimmer |
 
@@ -319,13 +319,18 @@
 | # | Severity | Location | Description | Status |
 |---|---|---|---|---|
 | 1 | 🔴 High | [gamification_provider.dart:85](file:///c:/Users/micha/.gemini/antigravity/scratch/RUN/mwendo/app/lib/core/gamification/gamification_provider.dart#L85) | **Set mutation bug** — `next.earnedBadges.add(c.badgeId)` mutates the set in-place. If `copyWith` didn't override `earnedBadges`, `next.earnedBadges` is the same object as the old state's set. | ⚠️ Unchanged |
-| 2 | 🔴 High | live_dashboard.dart | **No GPS permission request** — app will fail silently or crash on first run on a fresh install. | ⚠️ Unchanged |
+| 2 | 🔴 High | live_dashboard.dart | **No GPS permission request** — app will fail silently or crash on first run on a fresh install. | ✅ Fixed (run-sequence pass) |
 | 3 | 🟡 Medium | live_dashboard.dart | **SOS countdown never sends** — `_confirmSos` timer fires but doesn't call `SafetyService.sendSos`. | ⚠️ Unchanged |
 | 4 | 🟡 Medium | Dockerfile L3 | **Missing `go.sum`** — `COPY go.mod ./` should include `go.sum`. | ⚠️ Unchanged |
 | 5 | 🟡 Medium | tracking_controller | **No persistence** — completed runs update XP but the activity is discarded. | ✅ Fixed |
 | 6 | 🟡 Medium | All screens | **No backend integration** — `dio` is declared but never used. | ⚠️ Unchanged |
 | 7 | 🟢 Low | onboarding_page.dart L137 | **Hardcoded `Colors.white70`** — breaks on light theme. | ⚠️ Unchanged |
 | 8 | 🟢 Low | dashboard_page.dart L26 | **Fake 700ms loading** — shimmer is cosmetic, not tied to real data loading. | ⚠️ Unchanged |
+| 9 | 🔴 High | mwendo_map.dart:187 | **Run-sequence crash (C1)** — live map forced `MyLocationTrackingMode.trackingCompass`, handing the camera to the SDK (and to a not-yet-enabled location layer) → `PlatformException` on the first recording frame. | ✅ Fixed (now north-up `tracking`) |
+| 10 | 🔴 High | MwendoTrackingService.kt:163 | **Foreground-service crash (C2)** — `startForeground` failure was swallowed, leaving a broken foreground service that Android killed with `RemoteServiceException`. | ✅ Fixed (`stopSelf` + error to Dart) |
+| 11 | 🔴 High | mwendo_map.dart | **Manual zoom non-functional (Z1)** — while tracking, the SDK re-centred/re-rotated every fix so pinch-zoom was overridden; no zoom affordance existed. | ✅ Fixed (north-up tracking + `+/−` zoom FABs) |
+| 12 | 🟡 Medium | tracking_controller.dart:187 | **Stuck recovered run (C3)** — `restoreInterrupted` loaded points but never started the engine/ticker, so a recovered run never logged. (A prior fix auto-started the engine from `initState`, which crashed before permission; now load-only + started via the permission-gated path.) | ✅ Fixed |
+| 13 | 🟡 Medium | tracking_controller.dart:230 | **Double start (C4)** — recover branch called both `_engine.resume()` and `_engine.startRecording()`, spawning a second subscription/foreground start. | ✅ Fixed (single start via `restoreInterrupted`) |
 
 ### Fixes Applied (2026-07-09)
 
@@ -341,13 +346,38 @@
 
 6. **Fixed gamification provider async flicker** (`gamification_provider.dart:37-52`) — Changed fire-and-forget `.then()` to async/await pattern.
 
+7. **Consolidated the two map implementations & removed the offline tile server** (`mwendo_map.dart`, `route_map.dart`, `live_dashboard.dart`) — The live map (`_MapView`) and the detail map (`RouteMap`) were merged into a single shared `MwendoMap` widget with a `live`/`replay` mode enum. The custom loopback MBTiles/PMTiles tile server (`offline_map_provider.dart`, ~430 lines) was deleted along with `MapSource`/the toggle button, eliminating its UI-thread I/O, offline-by-default, and mid-run widget-destruction crash vectors. The app now uses the online Carto dark style everywhere; offline maps move to the roadmap (MapLibre's built-in offline regions API). The live map uses native `MyLocationTrackingMode.trackingCompass` while recording with an explicit re-center button (no more auto-snap-back on every GPS fix); the replay map sets its camera once and redraws via `updateLine` in a new `didUpdateWidget`. Supersedes the earlier `_autoFollow`-based fixes (#3, #4 above).
+
+### Fixes Applied — Run-sequence crash & map zoom (2026-07-09, second pass)
+
+> Full diagnosis in `docs/diagnostic_report.md`. All changes verified with
+> `flutter analyze` (clean) and the GPS engine package tests (pass).
+
+8. **Live map no longer forces compass tracking (C1/Z1)** (`mwendo_map.dart:187`) — `_trackingMode` now returns north-up `MyLocationTrackingMode.tracking` instead of `trackingCompass`, so the SDK no longer spins/owns the camera on every fix. This removes the camera-lock that made manual zoom non-functional and the tracking-while-location-disabled throw path.
+
+9. **Explicit zoom controls (Z1)** (`mwendo_map.dart`) — added `_ZoomControls` (`+/−` FABs calling `CameraUpdate.zoomIn()/zoomOut()`) overlaid on both live and replay maps, plus the existing re-center button. `onCameraTrackingDismissed` is now wired for both modes, and `_autoFollow` resets on run restart via `didUpdateWidget`.
+
+10. **Location permission enabled before `start()` (C1)** (`live_dashboard.dart:404`) — `_hasLocationPermission` is set synchronously once all location permissions are granted, so the map's location layer is enabled before the first recording frame requests tracking mode.
+
+11. **Foreground-service failure surfaced, not swallowed (C2)** (`MwendoTrackingService.kt`, `MwendoGpsEnginePlugin.kt`) — `startInForeground()` returns a `Boolean`; `onStartCommand` `stopSelf()`s if it fails (preventing the Android `RemoteServiceException` crash) and the plugin reports `FOREGROUND_FAILED` to Dart. The Dart `MethodChannelMwendoGpsEngine` now logs event-stream errors instead of crashing.
+
+12. **Recovered runs record via the permission-gated path (C3)** (`tracking_controller.dart`) — `restoreInterrupted()` is now **load-only** (loads points/state into `recovering`); the engine + ticker are started by `_start()`/`resume()`, which are only reached through the permission-gated Start flow. This fixes the original "stuck in `recovering`" bug **without** auto-starting GPS from `initState`.
+
+13. **No double start on recover (C4)** (`tracking_controller.dart`) — the `_start()` recover branch starts the engine once (`_engine.startRecording().listen` + `_startTicker`); `resume()` also starts the engine via `_start()` when no subscription exists, so a recovered run never double-subscribes.
+
+14. **Fixed crash regression on run-page open (follow-up to C3)** (`tracking_controller.dart`, `live_dashboard.dart`) — the previous C3 fix made `restoreInterrupted()` start the foreground GPS service from `initState`. Because `mwendo_recovery.json` persists across sessions, this started a foreground service + `requestLocationUpdates` *before location permission was granted* → `SecurityException` crash (and GPS hogging the UI on page open). Reverted to load-only and routed recovery through the permission-gated Start/Resume CTA; a recovered run now shows the primary Start button (`showStart = idle || recovering`).
+
+15. **Map load feedback (perceived slow load)** (`mwendo_map.dart`) — added a `_styleLoaded` flag + `CircularProgressIndicator` overlay shown until the remote Carto style finishes loading, and applied the zoom/recenter overlay to replay maps too. The map still depends on the online style (offline regions remain roadmap), but it no longer looks frozen/blank with no feedback.
+
+16. **Fixed Moving Time stopwatch leak** (`tracking_controller.dart`) — The internal `_movingStart` timer now correctly resets to `null` and commits its delta to `_accumulatedMovingMs` when speed drops below `0.3 m/s` (stops moving). Previously, the clock kept ticking behind the scenes. When the runner resumed, the accumulated idle time was incorrectly added to their moving time, distorting average pace.
+
 ---
 
 ## 17. Feature Completeness Scorecard (Post-Audit)
 
 | Feature (Blueprint) | UI | Logic | Backend | Data Layer | Score |
 |---|---|---|---|---|---|
-| GPS Tracking | ✅ | ✅ | n/a | ⚠️ JSON persist | 70% |
+| GPS Tracking | ✅ | ✅ | n/a | ⚠️ JSON persist | 90% |
 | Activity History | ✅ | ✅ | ✅ | ✅ JSON | 85% |
 | Challenges + XP | ✅ | ✅ | n/a | ✅ SharedPrefs | 85% |
 | Learn Academy | ✅ | ✅ | n/a | ✅ SharedPrefs | 80% |
@@ -361,4 +391,5 @@
 | i18n EN/SW | ⚠️ partial | ✅ toggle | n/a | ✅ | 50% |
 | Profile/Settings | ✅ | ⚠️ decorative | n/a | ⚠️ | 40% |
 
-**Overall Phase 1+2 completion: ~55%** — Activity persistence fixes improved the score from 45% to 55%.
+**Overall Phase 1+2 completion: ~60%** — Moving time and tracking accuracy improvements bumped the score to 60%.
+

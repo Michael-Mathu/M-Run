@@ -12,7 +12,6 @@ import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/network/session_provider.dart';
 import 'package:mwendo_app/core/safety/safety_provider.dart';
 import 'package:mwendo_app/data/models/run_record.dart';
-import 'package:mwendo_app/data/maps/offline_map_provider.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
 import 'package:mwendo_app/features/beat/ghost_target_provider.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
@@ -20,11 +19,8 @@ import 'package:mwendo_app/features/learn/data/beat_legends.dart';
 import 'package:mwendo_app/features/safety/safety_service.dart';
 import 'package:mwendo_app/features/tracking/tracking_controller.dart';
 import 'package:mwendo_app/widgets/celebration_overlay.dart';
+import 'package:mwendo_app/widgets/mwendo_map.dart';
 import 'package:mwendo_gps_engine/mwendo_gps_engine.dart';
-
-const _kDarkStyle =
-    'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-const _kDefaultCenter = LatLng(-1.2921, 36.8219); // Nairobi
 
 class LiveDashboard extends ConsumerStatefulWidget {
   const LiveDashboard({super.key});
@@ -36,10 +32,14 @@ class LiveDashboard extends ConsumerStatefulWidget {
 class _LiveDashboardState extends ConsumerState<LiveDashboard> {
   GamifiedChallenge? _celebrate;
   int _lastMilestone = 0;
+  bool _hasLocationPermission = false;
 
   @override
   void initState() {
     super.initState();
+    // Check location permission once here rather than on every GPS tick.
+    // It's re-checked only when a run is started (a relevant event).
+    _refreshLocationPermission();
     // Recover a run that was interrupted by a crash/kill.
     ref
         .read(trackingModelProvider.notifier)
@@ -49,17 +49,19 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
     });
   }
 
+  Future<void> _refreshLocationPermission() async {
+    final granted = await Permission.location.isGranted;
+    if (mounted && granted != _hasLocationPermission) {
+      setState(() => _hasLocationPermission = granted);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final m = ref.watch(trackingModelProvider);
     final cs = Theme.of(context).colorScheme;
     final locale = ref.watch(localeProvider);
     final ghost = ref.watch(ghostTargetProvider);
-    final mapSource = ref.watch(mapSourceProvider);
-    final offlineStyle = ref.watch(offlineMapProvider).value?.style;
-    final style = (mapSource == MapSource.offline && offlineStyle != null)
-        ? offlineStyle
-        : _kDarkStyle;
 
     // km milestone haptic
     final km = (m.distanceM / 1000).floor();
@@ -70,6 +72,11 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
 
     final isIdle = m.state == AppEngineState.idle;
     final isRecording = m.state == AppEngineState.recording;
+    // A recovered run sits in `recovering` with loaded points but no engine
+    // running. Show the primary Start/Resume CTA for it too, so resuming goes
+    // through the permission-gated start() path (which starts the engine).
+    final showStart =
+        isIdle || m.state == AppEngineState.recovering;
 
     return Scaffold(
       body: Stack(
@@ -82,10 +89,18 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                 child: Stack(
                   children: [
                     RepaintBoundary(
-                      child: _MapView(
-                        points: ref.read(trackingModelProvider.notifier).points,
-                        pointCount: m.pointCount,
-                        styleString: style,
+                      child: MwendoMap(
+                        // Snapshot the points as LatLng on every rebuild so the
+                        // map never holds a mutable reference that _onPoint
+                        // mutates concurrently (fixes Bug #6).
+                        points: [
+                          for (final p
+                              in ref.read(trackingModelProvider.notifier).points)
+                            LatLng(p.lat, p.lng),
+                        ],
+                        mode: MapMode.live,
+                        locationEnabled: _hasLocationPermission,
+                        isRecording: isRecording,
                       ),
                     ),
                     Positioned(
@@ -103,11 +118,6 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                       top: MediaQuery.of(context).padding.top + AppTheme.s12,
                       right: AppTheme.s16,
                       child: const _SosButton(),
-                    ),
-                    Positioned(
-                      top: MediaQuery.of(context).padding.top + AppTheme.s12,
-                      right: AppTheme.s16 + 56,
-                      child: const _MapToggleButton(),
                     ),
                   ],
                 ),
@@ -231,7 +241,7 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
             ],
           ),
           // Control buttons - positioned differently based on state
-          if (isIdle)
+          if (showStart)
             Positioned(
               bottom: MediaQuery.of(context).padding.bottom + AppTheme.s32,
               left: 0,
@@ -384,6 +394,9 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
           ),
         ),
       );
+      // Don't start the run without background permission — location updates
+      // will freeze when the screen locks, producing a broken run (fixes Bug #10).
+      return;
     }
     final notif = await Permission.notification.request();
     if (context.mounted && !notif.isGranted) {
@@ -393,7 +406,14 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
         ),
       );
     }
+    // Permission is now known granted — enable the map's location layer
+    // synchronously so the first recording frame requests tracking only after
+    // the layer is enabled (fixes C1). The async refresh below is a fallback.
+    if (mounted) setState(() => _hasLocationPermission = true);
     ref.read(trackingModelProvider.notifier).start();
+    // A run just started with permission granted — refresh so the map shows
+    // the user-location dot without polling permission on every GPS tick.
+    _refreshLocationPermission();
   }
 
   /// Full-screen explanation shown when location permission is permanently
@@ -693,7 +713,7 @@ class _StatusPill extends ConsumerWidget {
       AppEngineState.paused: (L10n.tr('paused', locale), AppTheme.paused),
       AppEngineState.recovering: (L10n.tr('gps_searching', locale), AppTheme.paused),
     };
-    final (label, color) = map[state]!;
+    final (label, color) = map[state] ?? (L10n.tr('unknown', locale), AppTheme.idle);
     final live = state == AppEngineState.recording;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppTheme.s12, vertical: AppTheme.s6),
@@ -818,41 +838,55 @@ class _SosButton extends ConsumerWidget {
       return;
     }
 
-    int remaining = 3;
-    late final Timer ticker;
-    final countdown = ValueNotifier(remaining);
+    final countdown = ValueNotifier(3);
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dlg) {
-        ticker = Timer.periodic(const Duration(seconds: 1), (t) {
+        var dismissed = false;
+        void dismiss() {
+          if (dismissed) return;
+          dismissed = true;
+          Navigator.of(dlg).pop();
+        }
+        int remaining = 3;
+        final ticker = Timer.periodic(const Duration(seconds: 1), (t) {
           remaining--;
           countdown.value = remaining;
           if (remaining <= 0) {
             t.cancel();
-            Navigator.of(dlg).pop();
+            dismiss();
             _sendSos(ref);
           }
         });
-        return AlertDialog(
-          backgroundColor: AppTheme.darkElevated,
-          title: Text(L10n.tr('sending_sos', locale), style: const TextStyle(color: Colors.white)),
-          content: ValueListenableBuilder<int>(
-            valueListenable: countdown,
-            builder: (_, v, _) => Text(
-              '${L10n.tr('alerting_contacts', locale)}$v…',
-              style: const TextStyle(color: Colors.white70),
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) {
+              ticker.cancel();
+              dismiss();
+            }
+          },
+          child: AlertDialog(
+            backgroundColor: AppTheme.darkElevated,
+            title: Text(L10n.tr('sending_sos', locale), style: const TextStyle(color: Colors.white)),
+            content: ValueListenableBuilder<int>(
+              valueListenable: countdown,
+              builder: (_, v, _) => Text(
+                '${L10n.tr('alerting_contacts', locale)}$v…',
+                style: const TextStyle(color: Colors.white70),
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  ticker.cancel();
+                  dismiss();
+                },
+                child: Text(L10n.tr('cancel', locale)),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                ticker.cancel();
-                Navigator.of(dlg).pop();
-              },
-              child: Text(L10n.tr('cancel', locale)),
-            ),
-          ],
         );
       },
     );
@@ -863,252 +897,8 @@ class _SosButton extends ConsumerWidget {
     final notifier = ref.read(trackingModelProvider.notifier);
     final pts = notifier.points;
     final last = pts.isNotEmpty ? pts.last : null;
-    final lat = last?.lat ?? _kDefaultCenter.latitude;
-    final lng = last?.lng ?? _kDefaultCenter.longitude;
+    final lat = last?.lat ?? kDefaultCenter.latitude;
+    final lng = last?.lng ?? kDefaultCenter.longitude;
     await SafetyService.sendSos(contacts, lat, lng);
-  }
-}
-
-class _MapToggleButton extends ConsumerWidget {
-  const _MapToggleButton();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final source = ref.watch(mapSourceProvider);
-    final offlineAvailable = ref.watch(offlineMapProvider).value?.style != null;
-
-    if (!offlineAvailable) return const SizedBox.shrink();
-
-    return Semantics(
-      button: true,
-      label: L10n.tr('map_toggle', ref.watch(localeProvider)),
-      child: Material(
-        color: Colors.black.withValues(alpha: 0.45),
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: () {
-            ref.read(mapSourceProvider.notifier).toggle();
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Icon(
-              source == MapSource.offline
-                  ? Icons.wifi_off_rounded
-                  : Icons.wifi_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Map view that draws the live route polyline and follows the user location.
-///
-/// Fixes three interrelated map bugs:
-///   1. Map never zooms to the first GPS fix.
-///   2. onCameraIdle fires on programmatic camera moves, permanently disabling
-///      auto-follow.
-///   3. Full widget rebuild + remove/add line on every GPS point.
-///
-/// Approach:
-///   - Trigger route syncs via [pointCount] (an int) instead of comparing the
-///     mutable list reference, which always returns false after initial build.
-///   - Use onCameraTrackingDismissed to detect *real* user pans (native SDK
-///     distinguishes gesture vs programmatic for us).
-///   - On each new point, re-enable auto-follow so the camera stays with the
-///     runner unless the user explicitly panned away.
-///   - Update existing line geometry in-place when possible (not remove+add).
-class _MapView extends StatefulWidget {
-  final List<TrackPoint> points;
-  final int pointCount;
-  final String styleString;
-  const _MapView({
-    required this.points,
-    required this.pointCount,
-    this.styleString = _kDarkStyle,
-  });
-
-  @override
-  State<_MapView> createState() => _MapViewState();
-}
-
-class _MapViewState extends State<_MapView> {
-  MapLibreMapController? _ctrl;
-  Line? _lineId;
-  bool _hasLocationPermission = false;
-  bool _isSyncing = false;
-  List<LatLng>? _pendingCoords;
-  bool _autoFollow = true;
-  bool _firstPointReceived = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkPermission();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  Future<void> _checkPermission() async {
-    final granted = await Permission.location.isGranted;
-    if (mounted && granted != _hasLocationPermission) {
-      setState(() {
-        _hasLocationPermission = granted;
-      });
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _MapView old) {
-    super.didUpdateWidget(old);
-    _checkPermission();
-    // Use pointCount (int) instead of points (list reference) to detect
-    // new data. The list is the same mutable object every rebuild, so
-    // widget.points != old.points would ALWAYS be false — the root cause
-    // of bugs #1 and #3.
-    if (widget.pointCount != old.pointCount) {
-      // Bug #1 fix: first GPS point → zoom to the blue dot
-      if (!_firstPointReceived && widget.pointCount > 0) {
-        _firstPointReceived = true;
-        _autoFollow = true;
-        final first =
-            LatLng(widget.points.first.lat, widget.points.first.lng);
-        _ctrl?.animateCamera(CameraUpdate.newLatLngZoom(first, 16));
-      } else if (widget.pointCount > 0) {
-        // Bug #2 fix: new route data re-enables auto-follow so the camera
-        // keeps tracking the runner's progress (unless user panned away,
-        // in which case onCameraTrackingDismissed cleared _autoFollow).
-        _autoFollow = true;
-      }
-      _syncRoute();
-    }
-  }
-
-  void _syncRoute() {
-    final ctrl = _ctrl;
-    if (ctrl == null) return;
-    // No drawable path yet — drop any stale line so the map only ever shows
-    // the route the user has actually recorded.
-    if (widget.pointCount < 2) {
-      _clearLine();
-      return;
-    }
-    final coords = widget.points
-        .map((p) => LatLng(p.lat, p.lng))
-        .toList(growable: false);
-
-    if (_isSyncing) {
-      _pendingCoords = coords;
-      return;
-    }
-
-    _isSyncing = true;
-    _drawRoute(coords).whenComplete(() {
-      _isSyncing = false;
-      if (_pendingCoords != null) {
-        _pendingCoords = null;
-        _syncRoute();
-      }
-    });
-  }
-
-  Future<void> _clearLine() async {
-    final ctrl = _ctrl;
-    if (ctrl == null || _lineId == null) return;
-    try {
-      await ctrl.removeLine(_lineId!);
-    } catch (_) {
-      // controller may be mid-dispose
-    }
-    _lineId = null;
-  }
-
-  Future<void> _drawRoute(List<LatLng> coords) async {
-    final ctrl = _ctrl;
-    if (ctrl == null || coords.length < 2) return;
-
-    // Bug #3 fix: update line geometry in-place instead of remove+add
-    if (_lineId != null) {
-      try {
-        await ctrl.updateLine(_lineId!, LineOptions(geometry: coords));
-      } catch (_) {
-        // updateLine may fail if the map engine hasn't indexed the line yet;
-        // fall back to the old remove+add pattern
-        try {
-          await ctrl.removeLine(_lineId!);
-        } catch (_) {}
-        _lineId = await ctrl.addLine(LineOptions(
-          geometry: coords,
-          lineColor: '#FE2E4B',
-          lineWidth: 6,
-          lineOpacity: 0.95,
-          lineBlur: 0.5,
-        ));
-      }
-    } else {
-      _lineId = await ctrl.addLine(LineOptions(
-        geometry: coords,
-        lineColor: '#FE2E4B',
-        lineWidth: 6,
-        lineOpacity: 0.95,
-        lineBlur: 0.5,
-      ));
-    }
-
-    // Only animate the camera if the user hasn't panned away to explore.
-    // When tracking mode is active, the native SDK handles follow.
-    if (coords.isNotEmpty && _autoFollow) {
-      await ctrl.animateCamera(CameraUpdate.newLatLng(coords.last));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MapLibreMap(
-      key: ValueKey(widget.styleString),
-      initialCameraPosition: const CameraPosition(
-        target: _kDefaultCenter,
-        zoom: 12,
-      ),
-      styleString: widget.styleString,
-      myLocationEnabled: _hasLocationPermission,
-      myLocationTrackingMode: _autoFollow
-          ? MyLocationTrackingMode.tracking
-          : MyLocationTrackingMode.none,
-      onMapCreated: (c) {
-        _ctrl = c;
-        _syncRoute();
-      },
-      onCameraTrackingDismissed: () {
-        // Bug #2 fix: this native callback fires ONLY when the user
-        // physically pans/zooms the map — NOT on programmatic
-        // animateCamera calls. We use it to let the user explore
-        // without the camera snapping back.
-        setState(() {
-          _autoFollow = false;
-        });
-      },
-      onUserLocationUpdated: (userLocation) {
-        // Bug #1 fix: before any route point is recorded, nudge the
-        // camera to the user's actual GPS location so the first fix
-        // is visible even if the native tracking mode hasn't engaged.
-        if (_ctrl != null && !_firstPointReceived) {
-          _ctrl!.animateCamera(
-            CameraUpdate.newLatLng(userLocation.position),
-          );
-        }
-      },
-      onMapClick: (point, coords) {
-        // User tapped — they'll manually pan; let them explore.
-        // Auto-follow disables via onCameraTrackingDismissed.
-      },
-    );
   }
 }

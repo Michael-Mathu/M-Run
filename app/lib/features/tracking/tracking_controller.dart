@@ -77,6 +77,10 @@ class TrackingModel extends Notifier<TrackingState> {
   // rapid pause/resume cycles (blueprint: "lock start/stop commands").
   Future<void>? _lock;
 
+  /// Tracks the most recent recovery write future so `stop()` can await it
+  /// before clearing, preventing a stale write from resurrecting a ghost run.
+  Future<void>? _pendingWrite;
+
   /// Expose raw points for the map without copying the full list every tick.
   List<TrackPoint> get points => _pts;
 
@@ -224,11 +228,14 @@ class TrackingModel extends Notifier<TrackingState> {
     if (await hasRecoverableRun()) {
       await restoreInterrupted();
       if (state.state == AppEngineState.recovering) {
-        _engine.resume();
+        // restoreInterrupted() only loads the saved points/state. The engine is
+        // started here (and only here, via the permission-gated start/resume
+        // path) so a recovered run actually records (fixes C3) without ever
+        // auto-starting GPS on page load — which crashed when location
+        // permission wasn't granted yet.
         _sub?.cancel();
         _sub = _engine.startRecording().listen(_onPoint);
         _startTicker();
-        // If the last recovered point was moving, resume moving time tracking
         if (_pts.isNotEmpty && _pts.last.speedMps > 0.3) {
           _movingStart = DateTime.now();
         }
@@ -263,8 +270,11 @@ class TrackingModel extends Notifier<TrackingState> {
     final isMoving = p.speedMps > 0.3;
     
     // Track moving time: start timer if speed > 0.3 m/s
-    if (isMoving && _movingStart == null) {
-      _movingStart = DateTime.now();
+    if (isMoving) {
+      _movingStart ??= DateTime.now();
+    } else if (_movingStart != null) {
+      _accumulatedMovingMs += DateTime.now().difference(_movingStart!).inMilliseconds;
+      _movingStart = null;
     }
     
     if (_pts.length == 1) {
@@ -297,23 +307,38 @@ class TrackingModel extends Notifier<TrackingState> {
       pointCount: _pts.length,
     );
     // Throttled recovery snapshot (every 10 points keeps the file small).
-    if (_pts.length % 10 == 0) _writeRecovery();
+    if (_pts.length % 10 == 0) {
+      _pendingWrite = _writeRecovery();
+    }
   }
 
   void pause() => _enqueue(() async {
         _engine.pause();
         _stopTicker(isPaused: true);
-        await _writeRecovery();
+        _pendingWrite = _writeRecovery();
+        await _pendingWrite;
         state = state.copyWith(state: AppEngineState.paused);
       });
 
   void resume() => _enqueue(() async {
+        // If the engine was never started (e.g. a recovered run the user is
+        // resuming from the `recovering` state), begin it through _start()
+        // rather than _engine.resume(), which would be a silent no-op.
+        if (_sub == null) {
+          await _start();
+          return;
+        }
         _engine.resume();
         _startTicker();
         state = state.copyWith(state: AppEngineState.recording);
       });
 
   Future<void> stop() => _enqueue(() async {
+        // Await any in-flight recovery write before clearing — prevents
+        // the race where _writeRecovery writes after _clearRecovery deletes
+        // the file (fixes Bug #8).
+        await _pendingWrite;
+        _pts.clear(); // Clear points before recovery clear (fixes Bug #7)
         _sub?.cancel();
         _sub = null;
         _stopTicker();
@@ -323,6 +348,8 @@ class TrackingModel extends Notifier<TrackingState> {
       });
 
   /// Serialise commands so rapid start/stop/pause can never interleave.
+  /// Exceptions propagate to the caller so corrupt engine state is surfaced
+  /// instead of silently swallowed (fixes Bug #2).
   Future<void> _enqueue(Future<void> Function() op) {
     final prev = _lock;
     final completer = Completer<void>();
@@ -330,8 +357,12 @@ class TrackingModel extends Notifier<TrackingState> {
     (prev ?? Future.value()).then((_) async {
       try {
         await op();
-      } finally {
         completer.complete();
+      } catch (e, st) {
+        // If _start() throws (e.g. platform exception from the GPS engine),
+        // propagate the error to the caller so it can rollback state, rather
+        // than silently leaving the engine in a corrupt "recording" state.
+        completer.completeError(e, st);
       }
     });
     return completer.future;

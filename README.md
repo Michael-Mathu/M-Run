@@ -48,9 +48,12 @@ leaderboards.
   race.
 
 ### Maps that work anywhere
-- **Offline maps** — MBTiles and PMTiles v3 bundles are served to MapLibre GL through a local
-  loopback tile server, so you can run without cell data.
-- **Online fallback** — with no bundle present, the map gracefully uses the online style.
+- **MapLibre GL basemap** — a single shared map widget renders the free, key-less Carto dark style
+  (`basemaps.cartocdn.com`), which works globally including across East Africa.
+- **One map, two modes** — the live tracking screen and the post-run activity detail screen share a
+  single `MwendoMap` widget (`live` and `replay` modes), so their drawing and camera logic stay in
+  sync. Offline maps are on the roadmap via MapLibre's built-in offline regions API — the previous
+  custom loopback tile server was removed.
 
 ### Learn & celebrate
 - **Running education** — an in-app academy covering technique, training science, and health.
@@ -147,11 +150,6 @@ A few platform specifics worth knowing before you build or review:
   keeps delivering updates while the screen is off if the user grants **"Allow all the time"** —
   otherwise tracking freezes when the screen locks. The app warns when this is denied; keeping the
   screen on also works.
-- **Offline maps need a bundle.** Drop an `.mbtiles` or `.pmtiles` file into the app's
-  `offline_maps/` directory (e.g. `getApplicationDocumentsDirectory()/offline_maps/`). With no
-  bundle, the map uses the online style and needs cell data.
-- **Cleartext loopback tiles.** `android:networkSecurityConfig` permits cleartext HTTP only to
-  `127.0.0.1`/`localhost`, so the offline tile server works on Android 9+.
 - **GPS plugin build fix.** `MwendoTrackingService.activityId` is package-visible (not `private`)
   and the `@SuppressLint` annotation was removed, because `androidx.annotation` is not on the AGP 9
   classpath. Both are required for the APK to compile.
@@ -159,13 +157,15 @@ A few platform specifics worth knowing before you build or review:
   `start()` and banked on pause/stop. GPS feeds distance, pace, and calories only — the timer
   itself never depends on a satellite fix. A run that moves less than 1 m is still not saved (the
   `distanceM < 1` guard is intentional).
-- **Route line follows the recorded path.** The live map (`_MapView`) uses
-  `MyLocationTrackingMode.none` so the camera follows the *recorded* `trackPoints` polyline rather
-  than the device's raw GPS fix (which lagged behind and made the route look wrong). The camera
-  preserves the user's zoom and recenters on the route's end via `CameraUpdate.newLatLng`. Line
-  drawing is serialized (`_isSyncing` / `_pendingCoords`) to avoid concurrent add/remove conflicts,
-  and stale lines are cleared when fewer than two points remain. The static past-route map
-  (`RouteMap`) draws the same polyline with no user-tracking line.
+- **One shared map widget.** Both the live tracking screen and the activity detail screen render
+  `MwendoMap` (`app/lib/widgets/mwendo_map.dart`). In `live` mode it draws the recorded
+  `trackPoints` polyline as it streams in and follows the runner with north-up native tracking
+  (`MyLocationTrackingMode.tracking` while recording); explicit `+/−` zoom buttons and a re-center
+  button (shown after the user pans away) give full manual camera control. In `replay` mode the
+  camera is set once and never moves, and the route redraws when points load asynchronously. Line
+  drawing is serialized (`_isSyncing` / `_pendingCoords`), updated in place via `updateLine`, and
+  stale lines are cleared when fewer than two points remain. `RouteMap` is a thin wrapper over
+  `MwendoMap` in `replay` mode.
 
 ---
 

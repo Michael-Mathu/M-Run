@@ -31,6 +31,17 @@ class MwendoGpsEnginePlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
             bound = true
             svc.setListener(this@MwendoGpsEnginePlugin)
             svc.start(pendingProfile)
+            if (!svc.foregroundReady) {
+                // Foreground service failed to start — surface the failure
+                // instead of leaving Dart believing the run is recording (C2).
+                pendingStartResult?.error(
+                    "FOREGROUND_FAILED",
+                    "Tracking service could not start in the foreground",
+                    null,
+                )
+                pendingStartResult = null
+                return
+            }
             pendingStartResult?.success(mapOf("activity_id" to svc.activityId))
             pendingStartResult = null
         }
@@ -86,19 +97,35 @@ class MwendoGpsEnginePlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
     }
 
     private fun startService(result: Result) {
+        // Capture and immediately null the pending result so no code path
+        // can call success() twice on the same Result object.
+        val prev = pendingStartResult
         pendingStartResult = result
+        // If there was a previous pending result that was never resolved
+        // (e.g. the user double-tapped Start), resolve it as a cancelled
+        // operation so Android's channel handler doesn't throw
+        // IllegalStateException("Reply already submitted").
+        if (prev != null) {
+            prev.success(null)
+        }
+
         val intent = Intent(context, MwendoTrackingService::class.java)
         ContextCompat.startForegroundService(context, intent)
-        // ponytail: binding is async; the activity_id is emitted from
-        // onServiceConnected once the location subscription has started.
+
         if (!bound) {
             context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+            // onServiceConnected will call pendingStartResult.success() once
+            // the service is ready.
+        } else if (service != null) {
+            // Already bound and service is available — respond immediately.
+            service!!.start(pendingProfile)
+            pendingStartResult?.success(mapOf("activity_id" to service!!.activityId))
+            pendingStartResult = null
         } else {
-            service?.let {
-                it.start(pendingProfile)
-                pendingStartResult?.success(mapOf("activity_id" to it.activityId))
-                pendingStartResult = null
-            }
+            // bound == true but service is null: we're in the window between
+            // onServiceDisconnected and a re-bind. Re-bind explicitly so
+            // onServiceConnected fires and resolves pendingStartResult.
+            context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
         }
     }
 

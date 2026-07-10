@@ -17,6 +17,21 @@
 
 ---
 
+## Table of Contents
+
+- [Why Mwendo?](#why-mwendo)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Development Notes](#development-notes)
+- [Licensing](#licensing)
+- [Roadmap & Status](#roadmap--status)
+- [Contributing](#contributing)
+- [Acknowledgements](#acknowledgements)
+
+---
+
 ## Why Mwendo?
 
 Most running apps lock your data behind proprietary clouds, demand a fast connection, and bury the
@@ -37,7 +52,7 @@ leaderboards.
 ## Features
 
 ### Track every run
-- **Native GPS engine** — a custom Flutter plugin (Kotlin on Android, Swift on iOS) keeps
+- **Native GPS engine** — a custom Flutter plugin (Kotlin on Android, Swift on iOS, Dart FFI bridge) keeps
   recording through a foreground service / background location session, so a run survives a locked
   screen or a backgrounded app.
 - **Live dashboard** — distance, elapsed time, current & average pace, speed,
@@ -53,8 +68,8 @@ leaderboards.
 ### Maps
 - **MapLibre GL basemap** — renders the highly legible Carto Dark style
   over a seamless WebGL engine. Requires an internet connection for tile fetching, providing crisp, zoomable cartography globally.
-- **Two maps, shared core** — the live tracking screen uses `MwendoMap` (`live` mode) and the post-run activity detail screen uses `RouteMap` (which wraps `MwendoMap` in `replay` mode), so their drawing and camera logic stay in
-  sync. All offline loopback server dependencies have been removed in favor of a stable online map client.
+- **Unified map widget** — `MwendoMap` handles both live tracking (`live` mode) and post-run replay (`replay` mode) in a single component, so drawing and camera logic stay in sync. All offline loopback server dependencies have been removed in favor of a stable online map client.
+- **EMA-smoothed live polyline** — the live tracking view applies an accuracy-driven exponential-moving-average on lat/lng and drops sub-5 m jitter, so consumer-chip GPS noise doesn't zigzag the on-screen route. The replay view uses the raw stored points.
 
 ### Learn & celebrate
 - **Running education** — an in-app academy covering technique, training science, and health.
@@ -82,7 +97,7 @@ leaderboards.
 - **Multilingual** — English and Swahili at launch, with full `i18n` throughout the UI.
 - **Export** — GPX and JSON export of your activities to share or back up.
 
-> Mwendo follows a nine-pillar blueprint (tracking, education, legends, challenges, gamification,
+> Mwendo follows a multi-pillar blueprint (tracking, education, legends, challenges, gamification,
 > safety, and more). The pillars above are the ones implemented today; the rest are on the roadmap.
 
 ---
@@ -96,9 +111,11 @@ Mwendo is a monorepo split into a mobile app, a backend service, and reusable na
 | **Mobile app** | Flutter & Dart, Riverpod (state), go_router (routing), drift/SQLite (local store), MapLibre GL (maps) |
 | **GPS engine** | Native Flutter plugin — Kotlin (Android) + Swift (iOS) + Dart, architecturally based on the Apache-2.0 [OpenTracks](https://github.com/OpenTracksApp/OpenTracks) project |
 | **FIT parser** | Dart package with a Rust core (FFI) for decoding Garmin FIT files |
-| **Backend** | Go REST API with a SQL datastore, containerised via Docker |
+| **Backend** | Go REST API with PostgreSQL + PostGIS and Redis cache, containerised via Docker |
 
-### Project structure
+---
+
+## Project Structure
 
 ```
 mwendo/
@@ -107,13 +124,17 @@ mwendo/
 ├── packages/
 │   ├── mwendo_gps_engine/   # Native GPS tracking plugin (Kotlin/Swift/Dart)
 │   └── mwendo_fit_parser/   # FIT file parser (Dart + Rust)
-├── docs/                # Design documentation and course content
-└── tools/               # Development and content tooling
+├── docs/                # Design documentation and course content (see LICENSING)
+├── tools/               # Development tooling (currently under development)
+├── .github/             # CI/CD workflows
+├── docker-compose.yml   # Local backend + Postgres + Redis stack
+├── Makefile             # Common development tasks (see `make help`)
+└── README.md            # This file
 ```
 
 ---
 
-## Getting started
+## Getting Started
 
 ### Prerequisites
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.x)
@@ -128,13 +149,13 @@ flutter pub get
 flutter run            # launches on a connected device or emulator
 ```
 
-### Run the backend
+### Run the backend (local stack)
 
 ```bash
 cd backend
 go run ./cmd/api       # serves the REST API (see backend/cmd/api/main.go)
-# or, containerised:
-docker build -t mwendo-api . && docker run -p 8080:8080 mwendo-api
+# or, with Docker:
+docker compose up -d   # starts API, PostgreSQL, Redis (see docker-compose.yml at repo root)
 ```
 
 The app talks to the backend over `POST /api/v1/auth/*`, `/api/v1/activities`, and
@@ -142,7 +163,7 @@ The app talks to the backend over `POST /api/v1/auth/*`, `/api/v1/activities`, a
 
 ---
 
-## Development notes
+## Development Notes
 
 A few platform specifics worth knowing before you build or review:
 
@@ -154,24 +175,26 @@ A few platform specifics worth knowing before you build or review:
 - **GPS plugin build fix.** `MwendoTrackingService.activityId` is package-visible (not `private`)
   and the `@SuppressLint` annotation was removed, because `androidx.annotation` is not on the AGP 9
   classpath. MapLibre GL currently requires a Java 21 compilation environment.
-- **Automated CI/CD via GitHub Actions.** Pushing a `v*` tag to the repository triggers a GitHub Actions workflow that automatically compiles a debug APK (with Java 21) and attaches it to a newly created GitHub Release.
-- **The run timer is wall-clock driven.** `elapsedMs` is accumulated by a 1s ticker started on
+- **Automated CI/CD via GitHub Actions.** Pushing a `v*` tag triggers a workflow that compiles a
+  debug APK (Java 21) and attaches it to a new GitHub Release.
+- **The run timer is wall-clock driven.** `elapsedMs` is accumulated by a 1 s ticker started on
   `start()` and banked on pause/stop. GPS feeds distance, pace, and calories only — the timer
   itself never depends on a satellite fix. A run that moves less than 1 m is still not saved (the
   `distanceM < 1` guard is intentional).
-- **Two map widgets.** The live tracking screen renders `MwendoMap` (`app/lib/widgets/mwendo_map.dart`) and the activity detail screen uses `RouteMap` (`app/lib/widgets/route_map.dart`). In `live` mode `MwendoMap` draws the recorded
-  `trackPoints` polyline as it streams in and follows the runner with north-up native tracking
-  (`MyLocationTrackingMode.tracking` while recording); explicit `+/−` zoom buttons and a re-center
-  button (shown after the user pans away) give full manual camera control. In `replay` mode the
-  camera is set once and never moves, and the route redraws when points load asynchronously. Line
-  drawing is serialized (`_isSyncing` / `_pendingCoords`), updated in place via `updateLine`, and
-  stale lines are cleared when fewer than two points remain. `RouteMap` is a thin wrapper over
-- **Live polyline is EMA-smoothed, not raw.** `TrackingModel` keeps the raw GPS stream
-  (used for stored distance, pace, and SOS) but exposes a separate `displayPoints` view that
-  applies an accuracy-driven exponential-moving-average on lat/lng and drops sub-5m jitter, so
-  consumer-chip GPS noise doesn't zigzag the on-screen route. The `RouteMap` replay view still
-  uses the raw stored points.
-  `MwendoMap` in `replay` mode.
+- **Single map widget, two modes.** `MwendoMap` (`app/lib/widgets/mwendo_map.dart`) serves both
+  live tracking (`live` mode) and post-run replay (`replay` mode). In `live` mode it draws the
+  recorded `trackPoints` polyline as it streams in and follows the runner with north-up native
+  tracking (`MyLocationTrackingMode.tracking`); explicit `+/-` zoom buttons and a re-center button
+  (shown after the user pans away) give full manual camera control. In `replay` mode the camera is
+  set once and never moves, and the route redraws when points load asynchronously. Line drawing is
+  serialized (`_isSyncing` / `_pendingCoords`), updated in place via `updateLine`, and stale lines
+  are cleared when fewer than two points remain. `RouteMap` (`app/lib/widgets/route_map.dart`) is a
+  thin wrapper over `MwendoMap` in `replay` mode.
+- **Development tasks.** Common commands are wrapped in the root `Makefile` — run `make help` for
+  a list (e.g., `make test`, `make lint`, `make build-apk`).
+
+For deeper internals (map syncing, EMA smoothing, state machines, run-sequence crash fixes), see
+[`docs/audit.md`](docs/audit.md) and [`docs/implementation_plan.md`](docs/implementation_plan.md).
 
 ---
 
@@ -183,10 +206,32 @@ Mwendo is open source under a per-component licence model:
 |-----------|---------|
 | Mobile app & local packages (`app/`, `packages/`) | MIT or Apache-2.0 |
 | Backend (`backend/`) | AGPL-3.0 |
-| Educational content (`docs/`) | CC-BY-SA-4.0 |
+| Educational content (`docs/`) | **Proprietary to Mwendo project** — see [CONTRIBUTING.md](CONTRIBUTING.md) for reuse terms. |
+
+> **Note:** The `docs/` directory currently carries no standard CC licence file. Content reuse terms
+> are under active discussion. For now, treat educational content as project-proprietary.
 
 See [`LICENSE-MIT`](./LICENSE-MIT), [`LICENSE-APACHE`](./LICENSE-APACHE), and
 [`LICENSE-AGPL`](./LICENSE-AGPL).
+
+---
+
+## Roadmap & Status
+
+- ✅ Core tracking (GPS, live dashboard, crash recovery, foreground service)
+- ✅ MapLibre GL live/replay maps with EMA smoothing
+- ✅ Education academy + 30 legend profiles + "How You Compare"
+- ✅ Ghost challenges with 4 difficulty tiers
+- ✅ Gamification (XP, levels, badges, streaks, leaderboards)
+- ✅ Emergency SOS
+- ✅ Auth + cloud sync + GPX/JSON export
+- ⬜ iOS background execution parity with Android (foreground service ↔️ background location)
+- ⬜ Offline map tiles (MapLibre offline regions)
+- ⬜ Wear OS / watchOS companion
+- ⬜ Backend-driven challenge/leaderboard sync (currently local-only)
+- ⬜ Full CI matrix (integration tests, golden image tests)
+
+See [`docs/implementation_plan.md`](docs/implementation_plan.md) for the full roadmap and pillar breakdown.
 
 ---
 

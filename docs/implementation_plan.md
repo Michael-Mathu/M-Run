@@ -17,6 +17,8 @@
 
 > [!TIP]
 > All toolchain prerequisites are installed and ready. No additional setup needed.
+>
+> **App Version: 1.0.1+2** (tagged `v1.0.1` — includes navigation fix, compilation fixes, LatLng type unification)
 
 ---
 
@@ -137,6 +139,7 @@ mwendo/
 ##### [NEW] CI/CD
 
 - GitHub Actions: lint + test on every PR for Flutter, Go, and the GPS plugin
+- GitHub Actions: automated release build (`release.yml`) compiles debug APK and attaches to GitHub Releases on `v*` tag push
 - Fastlane (or manual) for Play Store / TestFlight deploys in Phase 1
 
 ---
@@ -872,3 +875,23 @@ cd backend && go test ./...
 | `path_provider` | File system paths | BSD |
 
 No AI/ML packages. No commercial SDK dependencies.
+
+---
+
+## Changelog
+
+### v1.0.1 (2026-07-10) — Tag: `v1.0.1`
+- **Fix: Navigation back stack** — Changed `context.go` to `context.push` in `ghost_result_screen.dart` for "Rematch" and "Try harder tier" buttons. This preserves the Learn branch navigator history so back navigation correctly returns to Legends/Learn pages.
+- **Fix: Dart compilation errors** — Resolved all type mismatches across 12 files:
+  - LatLng type unification between `latlong2` and `maplibre_gl` (conversion helpers in `mwendo_map.dart`, updated `route_map.dart`, `activity_detail_page.dart`)
+  - GhostRaceController pattern matching with explicit casts in `maybeWhen`
+  - GhostDrawer `maybeWhen` null-safety wrapper
+  - PreRaceSheet added missing `appRouterProvider` import, passed `locale` to `_SplitTable`, fixed return type
+  - BeatLegendsPage removed duplicate/stray code, added `RunRecord` import
+- **Version bump:** 1.0.0+1 → 1.0.1+2
+
+### v1.0.0 (2026-07-09) — Initial working build
+- Core tracking, challenges, learn, legends, beat-the-legends UI complete
+- GPS engine plugin (Android) functional
+- Offline-first JSON persistence
+- MapLibre integration with Carto dark style

@@ -387,6 +387,12 @@
 17. **Added INTERNET Permission** (`app/android/app/src/main/AndroidManifest.xml`) — After removing the offline map server, MapLibre required internet access to fetch the Carto Dark style JSON. The missing `android.permission.INTERNET` caused an immediate `SecurityException` and native SIGABRT crash when location was granted, followed by black maps on subsequent launches. This is now fixed.
 18. **Automated GitHub Release CI** (`.github/workflows/release.yml`) — Added a GitHub Actions workflow using Java 21 to automatically compile `app-debug.apk` and attach it to GitHub Releases whenever a `v*` tag is pushed.
 
+### Fixes Applied — Navigation & Compilation (2026-07-10)
+
+19. **Fixed back navigation from Beat Legends to Learn tab** (`ghost_result_screen.dart`) — Changed `context.go('/beat/$ghostId')` to `context.push('/beat/$ghostId')` for "Rematch" and "Try harder tier" buttons. This preserves the Learn branch navigator's history so the system back button / `AppBackButton` correctly returns to the Learn tab instead of breaking navigation.
+
+20. **Fixed all Dart compilation errors** — Resolved type mismatches between `latlong2.LatLng` and `maplibre_gl.LatLng` across `mwendo_map.dart`, `route_map.dart`, `activity_detail_page.dart`, `beat_legends_page.dart`, `ghost_race_controller.dart`, `ghost_drawer.dart`, `pre_race_sheet.dart`, `ghost_result_screen.dart`. Added conversion helpers and fixed pattern matching in `maybeWhen` with explicit casts. Added missing `appRouterProvider` import and `locale` parameter passing. Bumped version to 1.0.1+2.
+
 ---
 
 ## 17. Feature Completeness Scorecard (Post-Audit)

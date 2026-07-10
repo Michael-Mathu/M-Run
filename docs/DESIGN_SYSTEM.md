@@ -2,6 +2,8 @@
 
 This document describes the canonical design tokens and components introduced to unify the UI across all screens.
 
+**App Version:** 1.0.1+2
+
 ## Design Tokens (in `AppTheme`)
 
 ### Spacing Scale (4pt grid)
@@ -198,3 +200,12 @@ When adding new tokens or components:
 3. Update this document
 4. Migrate 1-2 screens to validate the API
 5. Roll out incrementally
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.1 | 2026-07-10 | Fixed back navigation (Legends → Learn), fixed all Dart compilation errors (LatLng type mismatches, pattern matching, missing imports), bumped version to 1.0.1+2 |
+| 1.0.0 | 2026-07-09 | Initial design system extracted and documented |

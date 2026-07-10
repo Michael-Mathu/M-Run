@@ -23,7 +23,7 @@ Most running apps lock your data behind proprietary clouds, demand a fast connec
 sport's rich heritage under gamified noise. **Mwendo** takes the opposite stance:
 
 - **Privacy-first** — your runs are recorded and stored on your device. Cloud sync is opt-in.
-- **Offline-first** — full tracking, maps, education, and challenges work without a signal.
+- **Offline-first** — full tracking, education, and challenges work without a signal. Note: Maps currently require an internet connection.
 - **Open by default** — every line of code, map, and lesson is released under an open licence.
 - **Built for real conditions** — designed for low-end devices and intermittent connectivity,
   with a deep respect for East African running culture.
@@ -50,11 +50,10 @@ leaderboards.
 - **Serial command locking** — rapid start/pause/resume/stop taps are queued so they can never
   race.
 
-### Maps that work anywhere
-- **MapLibre GL basemap** — a single shared map widget renders the highly legible Carto Dark style
+### Maps
+- **MapLibre GL basemap** — renders the highly legible Carto Dark style
   over a seamless WebGL engine. Requires an internet connection for tile fetching, providing crisp, zoomable cartography globally.
-- **One map, two modes** — the live tracking screen and the post-run activity detail screen share a
-  single `MwendoMap` widget (`live` and `replay` modes), so their drawing and camera logic stay in
+- **Two maps, shared core** — the live tracking screen uses `MwendoMap` (`live` mode) and the post-run activity detail screen uses `RouteMap` (which wraps `MwendoMap` in `replay` mode), so their drawing and camera logic stay in
   sync. All offline loopback server dependencies have been removed in favor of a stable online map client.
 
 ### Learn & celebrate
@@ -160,8 +159,7 @@ A few platform specifics worth knowing before you build or review:
   `start()` and banked on pause/stop. GPS feeds distance, pace, and calories only — the timer
   itself never depends on a satellite fix. A run that moves less than 1 m is still not saved (the
   `distanceM < 1` guard is intentional).
-- **One shared map widget.** Both the live tracking screen and the activity detail screen render
-  `MwendoMap` (`app/lib/widgets/mwendo_map.dart`). In `live` mode it draws the recorded
+- **Two map widgets.** The live tracking screen renders `MwendoMap` (`app/lib/widgets/mwendo_map.dart`) and the activity detail screen uses `RouteMap` (`app/lib/widgets/route_map.dart`). In `live` mode `MwendoMap` draws the recorded
   `trackPoints` polyline as it streams in and follows the runner with north-up native tracking
   (`MyLocationTrackingMode.tracking` while recording); explicit `+/−` zoom buttons and a re-center
   button (shown after the user pans away) give full manual camera control. In `replay` mode the

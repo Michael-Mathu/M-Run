@@ -13,6 +13,7 @@ class AppTheme {
   static const Color paused = Color(0xFFF5A623);
   static const Color idle = Color(0xFF8A8A8E);
   static const Color achievement = Color(0xFFFFD15C); // gold
+  static const Color warning = Color(0xFFF5A623); // amber warning
 
   // Kenyan-flag semantic accents ("K-Earth"): green = prosperity/terrain/
   // success/data-viz. Not literal flag stripes — mapped to UI roles only.
@@ -37,6 +38,7 @@ class AppTheme {
   static const double s8 = 8;
   static const double s10 = 10;
   static const double s12 = 12;
+  static const double s14 = 14;
   static const double s16 = 16;
   static const double s20 = 20;
   static const double s24 = 24;
@@ -57,6 +59,37 @@ class AppTheme {
   static const Duration dSlow = Duration(milliseconds: 520);
   static const Curve curveSnappy = Curves.easeOutCubic;
   static const Curve curveSpring = Curves.elasticOut;
+
+  // Elevation / shadow tokens
+  static const List<BoxShadow> elevation0 = [];
+  static const List<BoxShadow> elevation1 = [
+    BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+  ];
+  static const List<BoxShadow> elevation2 = [
+    BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
+  ];
+  static const List<BoxShadow> elevation3 = [
+    BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 4)),
+  ];
+  static const List<BoxShadow> elevation4 = [
+    BoxShadow(color: Colors.black38, blurRadius: 24, offset: Offset(0, 8)),
+  ];
+
+  // Icon container sizes
+  static const double iconContainerSm = 40;
+  static const double iconContainerMd = 48;
+  static const double iconContainerLg = 56;
+  static const double iconContainerXl = 64;
+
+  // Avatar sizes
+  static const double avatarXs = 24;
+  static const double avatarSm = 32;
+  static const double avatarMd = 40;
+  static const double avatarLg = 56;
+  static const double avatarXl = 68;
+
+  // Navigation bar height
+  static const double navBarHeight = 72;
 
   // Heart-rate zone ramp (1..5): gray -> blue -> green -> orange -> red
   static const List<Color> hrZones = [

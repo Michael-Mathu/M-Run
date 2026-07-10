@@ -33,6 +33,7 @@ dependencies:
   sqlite3: ^3.0.0
   mwendo_gps_engine:
     path: ../packages/mwendo_gps_engine
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:

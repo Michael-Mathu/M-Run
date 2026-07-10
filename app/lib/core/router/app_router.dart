@@ -8,6 +8,7 @@ import 'package:mwendo_app/features/activity/activity_detail_page.dart';
 import 'package:mwendo_app/features/activity/activity_list_page.dart';
 import 'package:mwendo_app/features/auth/auth_page.dart';
 import 'package:mwendo_app/features/beat/beat_legends_page.dart';
+import 'package:mwendo_app/features/beat/ghost_result_screen.dart';
 import 'package:mwendo_app/features/challenges/challenge_detail_page.dart';
 import 'package:mwendo_app/features/challenges/challenge_library_page.dart';
 import 'package:mwendo_app/features/home/dashboard_page.dart';
@@ -195,6 +196,20 @@ GoRouter makeRouter(Ref ref) {
           pageBuilder: (context, state) => _slidePage(
             state,
             ActivityDetailPage(id: state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: '/ghost-result/:ghostId',
+          pageBuilder: (context, state) => _slidePage(
+            state,
+            GhostResultScreen(
+              ghostId: state.pathParameters['ghostId']!,
+              tierName: state.uri.queryParameters['tier'] ?? 'goat',
+              userWon: state.uri.queryParameters['won'] == 'true',
+              userElapsedMs: int.tryParse(state.uri.queryParameters['elapsedMs'] ?? '0') ?? 0,
+              splitsJson: state.uri.queryParameters['splits'] ?? '[]',
+              routePointsJson: state.uri.queryParameters['route'] ?? '[]',
+            ),
           ),
         ),
         GoRoute(

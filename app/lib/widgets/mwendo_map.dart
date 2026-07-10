@@ -1,10 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:latlong2/latlong.dart' as latlong;
+import 'package:maplibre_gl/maplibre_gl.dart' hide LatLng;
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
+import 'package:mwendo_app/features/beat/ghost_race_controller.dart';
+import 'package:mwendo_app/features/beat/ghost_race_utils.dart';
+import 'package:mwendo_app/features/learn/data/beat_legends.dart';
 
 /// Free, key-less, globally-available Carto dark basemap. Works everywhere
 /// (including Kenya) with no API key. This is the single style the app ships
@@ -14,12 +20,17 @@ const kDarkStyle =
     'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
 /// Default map centre (Nairobi) used before the first GPS fix arrives.
-const kDefaultCenter = LatLng(-1.2921, 36.8219);
+const kDefaultCenter = latlong.LatLng(-1.2921, 36.8219);
 
 const _kRouteColor = '#FE2E4B';
 const _kRouteWidth = 6.0;
 const _kRouteOpacity = 0.95;
 const _kRouteBlur = 0.5;
+
+const _kGhostRouteColor = '#FFFF5A1F';
+const _kGhostRouteWidth = 4.0;
+const _kGhostRouteOpacity = 0.7;
+const _kGhostMarkerColor = '#FFFF5A1F';
 
 /// How the [MwendoMap] behaves.
 ///
@@ -38,7 +49,7 @@ enum MapMode { live, replay }
 /// bugs.
 class MwendoMap extends StatefulWidget {
   /// Route vertices, ordered oldest → newest.
-  final List<LatLng> points;
+  final List<latlong.LatLng> points;
 
   /// Whether the map follows the user (live) or shows a static route (replay).
   final MapMode mode;
@@ -58,6 +69,15 @@ class MwendoMap extends StatefulWidget {
   /// MapLibre style JSON URL. Defaults to the online Carto dark style.
   final String styleString;
 
+  /// Optional ghost pace to race against (live mode only).
+  final GhostPace? ghost;
+
+  /// User's current distance along the route in meters (live mode only).
+  final double userDistanceM;
+
+  /// Ghost race state for rendering ghost marker position.
+  final GhostRaceState? raceState;
+
   const MwendoMap({
     super.key,
     required this.points,
@@ -66,6 +86,9 @@ class MwendoMap extends StatefulWidget {
     this.locationEnabled = false,
     this.isRecording = false,
     this.styleString = kDarkStyle,
+    this.ghost,
+    this.userDistanceM = 0,
+    this.raceState,
   });
 
   @override
@@ -75,11 +98,13 @@ class MwendoMap extends StatefulWidget {
 class _MwendoMapState extends State<MwendoMap> {
   MapLibreMapController? _ctrl;
   Line? _line;
+  Line? _ghostLine;
+  Symbol? _ghostMarker;
 
   // Serialise route draws so overlapping GPS ticks never race on the same
   // line id. A pending draw coalesces to the most recent coordinates.
   bool _isSyncing = false;
-  List<LatLng>? _pendingCoords;
+  List<latlong.LatLng>? _pendingCoords;
 
   // Live-only camera state.
   bool _autoFollow = true;
@@ -112,6 +137,12 @@ class _MwendoMapState extends State<MwendoMap> {
       }
       _syncRoute();
     }
+    // Update ghost overlay when ghost data or user distance changes
+    if (widget.ghost != old.ghost ||
+        widget.userDistanceM != old.userDistanceM ||
+        widget.raceState != old.raceState) {
+      _syncGhostOverlay();
+    }
   }
 
   void _syncRoute() {
@@ -123,7 +154,7 @@ class _MwendoMapState extends State<MwendoMap> {
       _clearLine();
       return;
     }
-    final coords = List<LatLng>.from(widget.points);
+    final coords = List<latlong.LatLng>.from(widget.points);
 
     if (_isSyncing) {
       _pendingCoords = coords;
@@ -154,7 +185,7 @@ class _MwendoMapState extends State<MwendoMap> {
     }
   }
 
-  Future<void> _drawRoute(List<LatLng> coords) async {
+  Future<void> _drawRoute(List<latlong.LatLng> coords) async {
     final ctrl = _ctrl;
     if (ctrl == null || coords.length < 2) return;
 
@@ -189,13 +220,65 @@ class _MwendoMapState extends State<MwendoMap> {
     }
   }
 
-  LineOptions _routeOptions(List<LatLng> coords) => LineOptions(
+  LineOptions _routeOptions(List<latlong.LatLng> coords) => LineOptions(
         geometry: coords,
         lineColor: _kRouteColor,
         lineWidth: _kRouteWidth,
         lineOpacity: _kRouteOpacity,
         lineBlur: _kRouteBlur,
       );
+
+  Future<void> _syncGhostOverlay() async {
+    final ctrl = _ctrl;
+    if (ctrl == null || widget.ghost == null || !_isLive) return;
+
+    final ghost = widget.ghost!;
+    final routePoints = widget.points;
+    if (routePoints.length < 2) return;
+
+    // Draw ghost route polyline (dashed) if not already drawn
+    if (_ghostLine == null) {
+      _ghostLine = await ctrl.addLine(LineOptions(
+        geometry: routePoints,
+        lineColor: _kGhostRouteColor,
+        lineWidth: _kGhostRouteWidth,
+        lineOpacity: _kGhostRouteOpacity,
+        linePattern: [10, 10], // dashed pattern
+      ));
+    }
+
+    // Compute ghost position along route based on user's current distance
+    final ghostPos = computeGhostPosition(
+      ghost,
+      widget.userDistanceM,
+      routePoints,
+    );
+
+    if (ghostPos != null) {
+      // Update or create ghost marker
+      if (_ghostMarker == null) {
+        _ghostMarker = await ctrl.addSymbol(SymbolOptions(
+          geometry: ghostPos,
+          iconImage: 'marker',
+          iconSize: 1.2,
+          iconColor: _kGhostMarkerColor,
+          iconHaloColor: Colors.white.value,
+          iconHaloWidth: 2,
+          iconHaloBlur: 4,
+        ));
+      } else {
+        await ctrl.updateSymbol(_ghostMarker!, SymbolOptions(
+          geometry: ghostPos,
+        ));
+
+        // Animate pulse effect via iconSize
+        final pulse = 1.0 + 0.3 * math.sin(DateTime.now().millisecondsSinceEpoch / 300);
+        await ctrl.updateSymbol(_ghostMarker!, SymbolOptions(
+          iconSize: 1.2 * pulse,
+        ));
+      }
+    }
+  }
 
   MyLocationTrackingMode get _trackingMode {
     if (!_isLive || !_autoFollow) return MyLocationTrackingMode.none;
@@ -213,6 +296,14 @@ class _MwendoMapState extends State<MwendoMap> {
     if (ctrl != null && widget.points.isNotEmpty) {
       ctrl.animateCamera(CameraUpdate.newLatLng(widget.points.last));
     }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.removeLine(_line);
+    _ctrl?.removeLine(_ghostLine);
+    _ctrl?.removeSymbol(_ghostMarker);
+    super.dispose();
   }
 
   @override
@@ -247,6 +338,8 @@ class _MwendoMapState extends State<MwendoMap> {
         // Annotations must be (re)added after the style has loaded; a style
         // (re)load also drops any previously-added line.
         _line = null;
+        _ghostLine = null;
+        _ghostMarker = null;
         _syncRoute();
         if (!_styleLoaded) {
           _styleLoaded = true;

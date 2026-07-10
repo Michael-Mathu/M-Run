@@ -1,17 +1,40 @@
 # mwendo_app
 
-A new Flutter project.
+A running app with ghost racing against legendary performances.
+
+## Features
+
+### Ghost Racing (Pillar 4)
+Race against legendary runners across distances from 800m to Marathon.
+
+- **12 Ghosts**: Kipchoge, Kiptum, Tergat, Kipyegon, Chebet, Rudisha, Bekele, Cheptegei, Kosgei, Chepngetich, Gebrselassie, Keino
+- **4 Difficulty Tiers**: Bronze (125%) → Silver (110%) → Gold (102%) → G.O.A.T. (100% WR)
+- **Live Map Visualization**: Ghost route (dashed polyline) + pulsing ghost marker at interpolated position
+- **Per-Split Comparison**: Swipe-up drawer shows each split with progress bar, target vs projected time, delta (±mm:ss), status icon
+- **Pre-Race Sheet**: Tier selector, split table preview, PB context, tier recommendation based on your PB
+- **Post-Race Results**: Full-screen hero with win/loss, overlaid map, split comparison table, summary stats, rematch / try harder / share CTAs
+
+### Core Tracking
+- GPS tracking with offline-first local storage (activities.json)
+- Live metrics: distance, pace, time, elevation, calories, heart rate, cadence
+- Crash recovery via temp JSON snapshot
+- Background location support
+
+### Architecture
+- Riverpod state management (NotifierProvider pattern)
+- GoRouter with StatefulShellRoute for bottom nav
+- MapLibre GL with Carto dark basemap (no API key)
+- Drift/SQLite ready (tables defined, currently using JSON file store)
+
+## Design System
+
+See [DESIGN_SYSTEM.md](../docs/DESIGN_SYSTEM.md) for canonical design tokens and components.
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Requires Flutter 3.19+ and Dart 3.3+.

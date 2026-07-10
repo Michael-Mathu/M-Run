@@ -13,12 +13,15 @@ import 'package:mwendo_app/core/network/session_provider.dart';
 import 'package:mwendo_app/core/safety/safety_provider.dart';
 import 'package:mwendo_app/data/models/run_record.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
-import 'package:mwendo_app/features/beat/ghost_target_provider.dart';
+import 'package:mwendo_app/features/beat/ghost_race_controller.dart';
+import 'package:mwendo_app/features/beat/ghost_race_utils.dart';
+import 'package:mwendo_app/features/beat/ghost_drawer.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
 import 'package:mwendo_app/features/learn/data/beat_legends.dart';
 import 'package:mwendo_app/features/safety/safety_service.dart';
 import 'package:mwendo_app/features/tracking/tracking_controller.dart';
 import 'package:mwendo_app/widgets/celebration_overlay.dart';
+import 'package:mwendo_app/widgets/metric_tile.dart';
 import 'package:mwendo_app/widgets/mwendo_map.dart';
 import 'package:mwendo_gps_engine/mwendo_gps_engine.dart';
 
@@ -59,9 +62,9 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
   @override
   Widget build(BuildContext context) {
     final m = ref.watch(trackingModelProvider);
+    final ghostRace = ref.watch(ghostRaceControllerProvider);
     final cs = Theme.of(context).colorScheme;
     final locale = ref.watch(localeProvider);
-    final ghost = ref.watch(ghostTargetProvider);
 
     // km milestone haptic
     final km = (m.distanceM / 1000).floor();
@@ -77,6 +80,13 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
     // through the permission-gated start() path (which starts the engine).
     final showStart =
         isIdle || m.state == AppEngineState.recovering;
+
+    // Start ghost race when run starts recording
+    ref.listen<GhostRaceStateData>(ghostRaceControllerProvider, (prev, next) {
+      if (next is GhostRaceArmedData && isRecording) {
+        ref.read(ghostRaceControllerProvider.notifier).start();
+      }
+    });
 
     return Scaffold(
       body: Stack(
@@ -103,6 +113,19 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                         mode: MapMode.live,
                         locationEnabled: _hasLocationPermission,
                         isRecording: isRecording,
+                        ghost: ghostRace.maybeWhen(
+                          racing: (r) => r.ghost,
+                          armed: (g, _) => g,
+                          finished: (g, _, _, _, _) => g,
+                          orElse: () => null,
+                        ),
+                        userDistanceM: m.distanceM,
+                        raceState: ghostRace.maybeWhen(
+                          racing: (r) => GhostRaceState.racing,
+                          armed: (_, _) => GhostRaceState.armed,
+                          finished: (_, _, _, _, _) => GhostRaceState.finished,
+                          orElse: () => GhostRaceState.idle,
+                        ),
                       ),
                     ),
                     Positioned(
@@ -110,17 +133,31 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                       left: AppTheme.s16,
                       child: _StatusPill(state: m.state),
                     ),
-                    if (!isIdle && ghost != null)
-                      Positioned(
-                        top: MediaQuery.of(context).padding.top + AppTheme.s12 + 36,
-                        left: AppTheme.s16,
-                        child: _GhostChip(ghost: ghost, m: m),
+                    if (!isIdle)
+                      ghostRace.maybeWhen(
+                        racing: (racing) => Positioned(
+                          top: MediaQuery.of(context).padding.top + AppTheme.s12 + 36,
+                          left: AppTheme.s16,
+                          child: _GhostChip(
+                            ghost: racing.ghost,
+                            m: m,
+                            deltaSeconds: racing.deltaSeconds,
+                          ),
+                        ),
+                        armed: (ghost, tier) => Positioned(
+                          top: MediaQuery.of(context).padding.top + AppTheme.s12 + 36,
+                          left: AppTheme.s16,
+                          child: _GhostChipArmed(ghost: ghost, tier: tier),
+                        ),
+                        orElse: () => const SizedBox.shrink(),
                       ),
                     Positioned(
                       top: MediaQuery.of(context).padding.top + AppTheme.s12,
                       right: AppTheme.s16,
                       child: const _SosButton(),
                     ),
+                    // Ghost drawer for live split comparison
+                    if (!isIdle) const GhostDrawer(),
                   ],
                 ),
               ),
@@ -149,74 +186,100 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                       AppTheme.s16,
                     ),
                     child: Column(
-                      children: [
-                        // Drag handle
-                        Container(
-                          width: 36,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: cs.onSurface.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(height: AppTheme.s16),
-                        // Primary metric: distance (large, hero)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildPrimaryMetric(
-                                value: (m.distanceM / 1000).toStringAsFixed(2),
-                                unit: 'km',
-                                label: L10n.tr('distance_label', locale),
-                                color: AppTheme.brand,
-                              ),
-                            ),
-                            const SizedBox(width: AppTheme.s24),
-                            Expanded(
-                              child: _buildPrimaryMetric(
-                                value: formatPace(m.paceMinPerKm),
-                                unit: '/km',
-                                label: L10n.tr('pace', locale),
-                                color: cs.onSurface,
-                              ),
-                            ),
-                            const SizedBox(width: AppTheme.s24),
-                            Expanded(
-                              child: _buildPrimaryMetric(
-                                value: formatDuration(m.elapsedMs),
-                                unit: '',
-                                label: L10n.tr('time_label', locale),
-                                color: cs.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppTheme.s16),
-                        // Secondary metrics row
-                        Container(
-                          padding: const EdgeInsets.all(AppTheme.s12),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(AppTheme.r12),
-                          ),
-                          child: Row(
-                            children: [
-                              _buildSecondaryMetric(
-                                icon: Icons.terrain_rounded,
-                                value: m.elevationGainM.toStringAsFixed(0),
-                                unit: 'm',
-                                color: cs.onSurface,
-                              ),
-                              _buildDivider(cs),
-                              _buildSecondaryMetric(
-                                icon: Icons.local_fire_department_rounded,
-                                value: m.calories.toString(),
-                                unit: 'kcal',
-                                color: cs.onSurface,
-                              ),
-                            ],
-                          ),
-                        ),
+children: [
+                         // Drag handle
+                         Container(
+                           width: 36,
+                           height: 4,
+                           decoration: BoxDecoration(
+                             color: cs.onSurface.withValues(alpha: 0.2),
+                             borderRadius: BorderRadius.circular(2),
+                           ),
+                         ),
+                         const SizedBox(height: AppTheme.s16),
+                         // Primary metrics using canonical MetricTile
+                         Row(
+                           children: [
+                             Expanded(
+                               child: MetricTile(
+                                 variant: MetricVariant.hero,
+                                 value: (m.distanceM / 1000).toStringAsFixed(2),
+                                 label: L10n.tr('distance_label', locale),
+                                 valueColor: AppTheme.brand,
+                               ),
+                             ),
+                             const SizedBox(width: AppTheme.s24),
+                             Expanded(
+                               child: MetricTile(
+                                 variant: MetricVariant.hero,
+                                 value: formatPace(m.paceMinPerKm),
+                                 label: L10n.tr('pace', locale),
+                                 valueColor: cs.onSurface,
+                               ),
+                             ),
+                             const SizedBox(width: AppTheme.s24),
+                             Expanded(
+                               child: MetricTile(
+                                 variant: MetricVariant.hero,
+                                 value: formatDuration(m.elapsedMs),
+                                 label: L10n.tr('time_label', locale),
+                                 valueColor: cs.onSurface,
+                               ),
+                             ),
+                           ],
+                         ),
+                         const SizedBox(height: AppTheme.s16),
+// Secondary metrics row
+                         Container(
+                           padding: const EdgeInsets.all(AppTheme.s12),
+                           decoration: BoxDecoration(
+                             color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                             borderRadius: BorderRadius.circular(AppTheme.r12),
+                           ),
+                           child: Row(
+                             children: [
+                               Expanded(
+                                 child: Row(
+                                   children: [
+                                     Icon(Icons.terrain_rounded, size: 16, color: cs.onSurface.withValues(alpha: 0.7)),
+                                     const SizedBox(width: AppTheme.s8),
+                                     Expanded(
+                                       child: MetricTile(
+                                         variant: MetricVariant.inline,
+                                         value: m.elevationGainM.toStringAsFixed(0),
+                                         label: 'm',
+                                         valueColor: cs.onSurface,
+                                         align: TextAlign.end,
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+),
+                                Container(
+                                  width: 1,
+                                  height: 40,
+                                  color: cs.onSurface.withValues(alpha: 0.1),
+                                ),
+                                Expanded(
+                                 child: Row(
+                                   children: [
+                                     Icon(Icons.local_fire_department_rounded, size: 16, color: cs.onSurface.withValues(alpha: 0.7)),
+                                     const SizedBox(width: AppTheme.s8),
+                                     Expanded(
+                                       child: MetricTile(
+                                         variant: MetricVariant.inline,
+                                         value: m.calories.toString(),
+                                         label: 'kcal',
+                                         valueColor: cs.onSurface,
+                                         align: TextAlign.end,
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                               ),
+                             ],
+                           ),
+                         ),
                       ],
                     ),
                   ),
@@ -261,84 +324,6 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPrimaryMetric({
-    required String value,
-    required String unit,
-    required String label,
-    required Color color,
-  }) {
-    final text = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: text.displaySmall!.copyWith(
-            fontWeight: FontWeight.w800,
-            color: color,
-            fontFeatures: const [FontFeature.tabularFigures()],
-            height: 1.0,
-          ),
-        ),
-        if (unit.isNotEmpty)
-          Text(
-            unit,
-            style: text.bodyMedium!.copyWith(
-              color: color.withValues(alpha: 0.6),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        const SizedBox(height: AppTheme.s4),
-        Text(
-          label.toUpperCase(),
-          style: text.labelSmall!.copyWith(
-            color: color.withValues(alpha: 0.5),
-            letterSpacing: 1.2,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSecondaryMetric({
-    required IconData icon,
-    required String value,
-    required String unit,
-    required Color color,
-  }) {
-    final text = Theme.of(context).textTheme;
-    return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, size: 16, color: color.withValues(alpha: 0.7)),
-          const SizedBox(height: AppTheme.s4),
-          Text(
-            value,
-            style: text.titleMedium!.copyWith(
-              fontWeight: FontWeight.w700,
-              color: color,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-          Text(
-            unit,
-            style: text.labelSmall!.copyWith(
-              color: color.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDivider(ColorScheme cs) {
-    return Container(
-      width: 1,
-      height: 40,
-      color: cs.onSurface.withValues(alpha: 0.1),
     );
   }
 
@@ -404,12 +389,18 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
       }
     }
     final avgCadence = cadenceCount > 0 ? (cadenceSum / cadenceCount).round() : 0;
-    final ghost = ref.read(ghostTargetProvider);
+    final ghostRaceState = ref.read(ghostRaceControllerProvider);
+    final ghost = ghostRaceState.maybeWhen(
+      racing: (r) => r.ghost,
+      armed: (g, _) => g,
+      finished: (g, _, _, _, _) => g,
+      orElse: () => null,
+    );
 
     await ref.read(trackingModelProvider.notifier).stop();
 
     if (distanceM < 1) {
-      ref.read(ghostTargetProvider.notifier).set(null);
+      ref.read(ghostRaceControllerProvider.notifier).reset();
       return;
     }
 
@@ -457,20 +448,43 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
         );
       }
     }
-    if (ghost != null) {
+
+    // Handle ghost race finish
+    if (ghost != null && ghostRaceState is GhostRaceRacingData) {
       final userAvg = (elapsedMs / 60000) / (distanceM / 1000);
       final beat = userAvg <= ghost.avgPaceMinPerKm;
       final newlyGhost = ref.read(gamificationProvider.notifier).recordBeatLegend(ghost, beat);
+
+      // Finish the ghost race controller
+      ref.read(ghostRaceControllerProvider.notifier).finish(
+        userWon: beat,
+        userElapsedMs: elapsedMs,
+      );
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(beat
-                ? 'You beat ${ghost.name}! 🏆 (${formatPace(userAvg)} vs ${formatPace(ghost.avgPaceMinPerKm)} /km)'
-                : '${ghost.name} held you off — you: ${formatPace(userAvg)} /km, ghost: ${formatPace(ghost.avgPaceMinPerKm)} /km'),
-          ),
+        // Navigate to ghost result screen
+        final ghostRaceFinal = ref.read(ghostRaceControllerProvider);
+        ghostRaceFinal.maybeWhen(
+          finished: (finished) {
+            context.go('/ghost-result/${ghost.id}', extra: {
+              'tier': finished.tier.name,
+              'won': finished.result == GhostRaceResult.win,
+              'elapsedMs': finished.userElapsedMs,
+              'splits': finished.splitComparisons.map((s) => {
+                'index': s.splitIndex,
+                'ghostTime': s.ghostSplitTime,
+                'userTime': s.userProjectedSplitTime,
+                'delta': s.deltaSeconds,
+                'isAhead': s.isAhead,
+                'progress': s.progressInSplit,
+              }).toList(),
+              'routePoints': trackPoints.map((p) => {'lat': p.lat, 'lng': p.lng}).toList(),
+            });
+          },
+          orElse: () {},
         );
       }
-      ref.read(ghostTargetProvider.notifier).set(null);
+
       if (newlyGhost.isNotEmpty && mounted) {
         setState(() => _celebrate = newlyGhost.first);
       }
@@ -665,7 +679,8 @@ class _StatusPill extends ConsumerWidget {
 class _GhostChip extends ConsumerWidget {
   final GhostPace ghost;
   final TrackingState m;
-  const _GhostChip({required this.ghost, required this.m});
+  final double deltaSeconds;
+  const _GhostChip({required this.ghost, required this.m, required this.deltaSeconds});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -673,8 +688,7 @@ class _GhostChip extends ConsumerWidget {
     final userAvg = m.distanceM > 0
         ? (m.elapsedMs / 60000) / (m.distanceM / 1000)
         : 0.0;
-    final delta = userAvg - ghost.avgPaceMinPerKm; // <0 means user is ahead
-    final ahead = delta <= 0 && userAvg > 0;
+    final ahead = deltaSeconds < 0 && userAvg > 0;
     final color = ahead ? AppTheme.recording : AppTheme.idle;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppTheme.s10, vertical: AppTheme.s6),
@@ -693,8 +707,37 @@ class _GhostChip extends ConsumerWidget {
           ),
           const SizedBox(width: AppTheme.s6),
           Text(
-            userAvg > 0 ? '${ahead ? "" : "+"}${formatPace(delta.abs())}' : '',
+            userAvg > 0 ? '${ahead ? "" : "+"}${formatSeconds(deltaSeconds.abs())}' : '',
             style: Theme.of(context).textTheme.labelSmall!.copyWith(color: color, fontFeatures: const [FontFeature.tabularFigures()]),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GhostChipArmed extends ConsumerWidget {
+  final GhostPace ghost;
+  final DifficultyTier tier;
+  const _GhostChipArmed({required this.ghost, required this.tier});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(localeProvider);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.s10, vertical: AppTheme.s6),
+      decoration: BoxDecoration(
+        color: tier.color.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(AppTheme.rFull),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(tier.badge, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: AppTheme.s4),
+          Text(
+            '${L10n.tr('ghost_label', locale)} ${tier.label} · ${L10n.tr('ready_to_race', locale)}',
+            style: Theme.of(context).textTheme.labelSmall!.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
           ),
         ],
       ),

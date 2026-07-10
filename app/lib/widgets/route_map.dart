@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import 'package:mwendo_app/widgets/mwendo_map.dart';
@@ -13,7 +14,7 @@ export 'package:mwendo_app/widgets/mwendo_map.dart' show kDarkStyle, kDefaultCen
 /// and camera logic (and stay in sync). The camera is set once and never
 /// moves; the polyline redraws whenever [points] changes.
 class RouteMap extends StatelessWidget {
-  final List<LatLng> points;
+  final List<latlong.LatLng> points;
   final double zoom;
 
   const RouteMap({

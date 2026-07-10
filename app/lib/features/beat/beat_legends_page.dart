@@ -3,14 +3,17 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/features/beat/ghost_race_controller.dart';
 import 'package:mwendo_app/features/beat/ghost_race_utils.dart';
 import 'package:mwendo_app/features/beat/pre_race_sheet.dart';
 import 'package:mwendo_app/features/learn/data/beat_legends.dart';
 import 'package:mwendo_app/features/learn/data/legends.dart';
+import 'package:mwendo_app/data/models/run_record.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
 
 class BeatLegendsPage extends ConsumerStatefulWidget {
@@ -65,11 +68,14 @@ class _BeatLegendsPageState extends ConsumerState<BeatLegendsPage> {
     final activities = ref.watch(activitiesProvider);
 
     // Compute user's PB for each distance
-    final pbMap = _computePBs(activities.valueOrNull ?? []);
+    final pbMap = activities.maybeWhen(
+      data: (list) => _computePBs(list),
+      orElse: () => <String, int>{},
+    );
 
     return Scaffold(
       appBar: AppBar(
-        leading: const AppBackButton(),
+        leading: AppBackButton(),
         title: Text(L10n.tr('beat_the_legends', locale)),
         centerTitle: false,
       ),
@@ -88,6 +94,9 @@ class _BeatLegendsPageState extends ConsumerState<BeatLegendsPage> {
                     _selected = _filteredGhosts.first;
                   }
                 }),
+                locale: locale,
+                pbMap: pbMap,
+                selectedGhost: _selected,
               ),
             ),
           ),
@@ -237,44 +246,99 @@ class _DistanceFilterTabs extends StatelessWidget {
   final List<String> labels;
   final String selected;
   final ValueChanged<String> onChanged;
+  final AppLocale locale;
+  final Map<String, int> pbMap;
+  final GhostPace selectedGhost;
 
-  const _DistanceFilterTabs({required this.labels, required this.selected, required this.onChanged});
+  const _DistanceFilterTabs({
+    required this.labels,
+    required this.selected,
+    required this.onChanged,
+    required this.locale,
+    required this.pbMap,
+    required this.selectedGhost,
+  });
+
+  DifficultyTier? get _recommendedTier {
+    final userPb = pbMap[selectedGhost.distanceLabel];
+    if (userPb == null) return null;
+    for (final tier in DifficultyTier.values.reversed) {
+      final scaled = (selectedGhost.totalSeconds * tier.factor).round();
+      if (userPb <= scaled) {
+        return tier == DifficultyTier.goat ? null : DifficultyTier.values[tier.index + 1];
+      }
+    }
+    return DifficultyTier.bronze;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    final locale = context.read(localeProvider);
+    final recommendedTier = _recommendedTier;
 
-    return SizedBox(
-      height: 40,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: labels.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppTheme.s8),
-        itemBuilder: (_, i) {
-          final label = labels[i];
-          final active = label == selected;
-          final displayLabel = label == 'all' ? L10n.tr('all_distances', locale) : label;
-          return GestureDetector(
-            onTap: () => onChanged(label),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: AppTheme.s16, vertical: AppTheme.s8),
-              decoration: BoxDecoration(
-                color: active ? AppTheme.brand : cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(AppTheme.rFull),
-              ),
-              child: Text(
-                displayLabel,
-                style: Theme.of(context).textTheme.labelMedium!.copyWith(
-                      color: active ? Colors.white : cs.onSurface,
-                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                    ),
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (recommendedTier != null) ...[
+          Container(
+            padding: const EdgeInsets.all(AppTheme.s12),
+            decoration: BoxDecoration(
+              color: recommendedTier.color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(AppTheme.r12),
+              border: Border.all(color: recommendedTier.color.withValues(alpha: 0.5)),
             ),
-          );
-        },
-      ),
+            child: Row(
+              children: [
+                Icon(Icons.lightbulb_outline_rounded, color: recommendedTier.color, size: 20),
+                const SizedBox(width: AppTheme.s8),
+                Expanded(
+                  child: Text(
+                    '${L10n.tr('tier_recommendation', locale)} ${recommendedTier.badge} ${recommendedTier.label} — ${L10n.tr('based_on_your_pb', locale)}',
+                    style: text.bodySmall!.copyWith(color: recommendedTier.color, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppTheme.s12),
+        ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppTheme.s4, vertical: AppTheme.s4),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(AppTheme.r12),
+          ),
+          child: Row(
+            children: [
+              for (final label in labels) ...[
+                if (label != labels.first) const SizedBox(width: AppTheme.s4),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => onChanged(label),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: AppTheme.s10),
+                      decoration: BoxDecoration(
+                        color: label == selected ? AppTheme.brand.withValues(alpha: 0.22) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(AppTheme.r8),
+                        border: label == selected ? Border.all(color: AppTheme.brand) : null,
+                      ),
+                      child: Text(
+                        label == 'all' ? L10n.tr('all_distances', locale) : label,
+                        textAlign: TextAlign.center,
+                        style: text.labelSmall!.copyWith(
+                          color: label == selected ? AppTheme.brand : cs.onSurface.withValues(alpha: 0.6),
+                          fontWeight: label == selected ? FontWeight.w700 : FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -296,76 +360,47 @@ class _TierSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    final locale = context.read(localeProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (recommendedTier != null) ...[
-          Container(
-            padding: const EdgeInsets.all(AppTheme.s12),
-            decoration: BoxDecoration(
-              color: recommendedTier!.color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(AppTheme.r12),
-              border: Border.all(color: recommendedTier!.color.withValues(alpha: 0.5)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.lightbulb_outline_rounded, color: recommendedTier!.color, size: 20),
-                const SizedBox(width: AppTheme.s8),
-                Expanded(
-                  child: Text(
-                    '${L10n.tr('tier_recommendation', locale)} ${recommendedTier!.badge} ${recommendedTier!.label} — ${L10n.tr('based_on_your_pb', locale)}',
-                    style: text.bodySmall!.copyWith(color: recommendedTier!.color, fontWeight: FontWeight.w600),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.s4, vertical: AppTheme.s4),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppTheme.r12),
+      ),
+      child: Row(
+        children: [
+          for (final t in DifficultyTier.values) ...[
+            if (t != DifficultyTier.values.first)
+              const SizedBox(width: AppTheme.s4),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => onChanged(t),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: AppTheme.s10),
+                  decoration: BoxDecoration(
+                    color: t == tier ? t.color.withValues(alpha: 0.22) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppTheme.r8),
+                    border: t == tier ? Border.all(color: t.color) : null,
+                  ),
+                  child: Column(
+                    children: [
+                      Text(t.badge, style: const TextStyle(fontSize: 18)),
+                      const SizedBox(height: AppTheme.s2),
+                      Text(t.label,
+                          style: text.labelSmall!.copyWith(
+                            color: t == tier ? t.color : cs.onSurface.withValues(alpha: 0.6),
+                            fontWeight: t == tier ? FontWeight.w700 : FontWeight.w600,
+                          )),
+                      if (t == recommendedTier)
+                        Text('★', style: TextStyle(fontSize: 10, color: t.color)),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppTheme.s12),
+          ],
         ],
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppTheme.s4, vertical: AppTheme.s4),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppTheme.r12),
-          ),
-          child: Row(
-            children: [
-              for (final t in DifficultyTier.values) ...[
-                if (t != DifficultyTier.values.first)
-                  const SizedBox(width: AppTheme.s4),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => onChanged(t),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: AppTheme.s10),
-                      decoration: BoxDecoration(
-                        color: t == tier ? t.color.withValues(alpha: 0.22) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(AppTheme.r8),
-                        border: t == tier ? Border.all(color: t.color) : null,
-                      ),
-                      child: Column(
-                        children: [
-                          Text(t.badge, style: const TextStyle(fontSize: 18)),
-                          const SizedBox(height: AppTheme.s2),
-                          Text(t.label,
-                              style: text.labelSmall!.copyWith(
-                                color: t == tier ? t.color : cs.onSurface.withValues(alpha: 0.6),
-                                fontWeight: t == tier ? FontWeight.w700 : FontWeight.w600,
-                              )),
-                          if (t == recommendedTier)
-                            Text('★', style: TextStyle(fontSize: 10, color: t.color)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

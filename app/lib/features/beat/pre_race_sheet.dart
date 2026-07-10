@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
+import 'package:mwendo_app/core/router/app_router.dart';
 import 'package:mwendo_app/features/beat/ghost_race_controller.dart';
 import 'package:mwendo_app/features/beat/ghost_race_utils.dart';
 import 'package:mwendo_app/features/learn/data/beat_legends.dart';
@@ -110,7 +111,7 @@ class PreRaceBottomSheet extends ConsumerWidget {
                   Text(L10n.tr('pace_per_segment', locale), style: text.titleMedium),
                   Text(L10n.tr('seconds_per_km', locale), style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
                   const SizedBox(height: AppTheme.s12),
-                  _SplitTable(ghost: activeGhost),
+                  _SplitTable(ghost: activeGhost, locale: locale),
                   const SizedBox(height: AppTheme.s20),
 
                   // Description
@@ -152,7 +153,7 @@ class PreRaceBottomSheet extends ConsumerWidget {
                   const SizedBox(height: AppTheme.s12),
 
                   Text(
-                    '${L10n.tr('during_a_run', locale)}${formatDuration(activeGhost.totalSeconds)}.',
+                    '${L10n.tr('during_a_run', locale)}${formatSeconds(activeGhost.totalSeconds.toDouble())}.',
                     style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
                     textAlign: TextAlign.center,
                   ),
@@ -169,7 +170,8 @@ class PreRaceBottomSheet extends ConsumerWidget {
 
 class _SplitTable extends StatelessWidget {
   final GhostPace ghost;
-  const _SplitTable({required this.ghost});
+  final AppLocale locale;
+  const _SplitTable({required this.ghost, required this.locale});
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +230,7 @@ class _SplitTable extends StatelessWidget {
 
 /// Helper to show the pre-race sheet.
 Future<void> showPreRaceSheet(BuildContext context, WidgetRef ref, GhostPace ghost, DifficultyTier tier) {
-  showModalBottomSheet(
+  return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

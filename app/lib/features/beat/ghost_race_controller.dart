@@ -43,7 +43,7 @@ class GhostRaceController extends Notifier<GhostRaceStateData> {
     if (state is! GhostRaceRacingData) return;
     final racing = state as GhostRaceRacingData;
 
-    final comparisons = _computeAllSplitComparisons(
+    final result = _computeAllSplitComparisons(
       ghost: racing.ghost,
       userDistanceM: userDistanceM,
       userElapsedMs: userElapsedMs,
@@ -60,10 +60,11 @@ class GhostRaceController extends Notifier<GhostRaceStateData> {
     final projectedFinish = ghostProjectedFinishTime(racing.ghost, userDistanceM, userElapsedMs);
 
     state = racing.copyWith(
-      splitComparisons: comparisons,
+      splitComparisons: result.$1,
       ghostPosition: ghostPos,
       deltaSeconds: delta,
       projectedFinishSeconds: projectedFinish,
+      currentSplitIndex: result.$2,
     );
   }
 
@@ -84,7 +85,7 @@ class GhostRaceController extends Notifier<GhostRaceStateData> {
   void reset() => state = GhostRaceStateData.idle();
 
   /// Computes comparisons for all splits up to current.
-  List<SplitComparison> _computeAllSplitComparisons({
+  (List<SplitComparison>, int) _computeAllSplitComparisons({
     required GhostPace ghost,
     required double userDistanceM,
     required double userElapsedMs,
@@ -138,7 +139,7 @@ class GhostRaceController extends Notifier<GhostRaceStateData> {
       ));
     }
 
-    return results;
+    return (results, currentSplitIndex);
   }
 }
 
@@ -177,10 +178,10 @@ sealed class GhostRaceStateData {
         return idle?.call();
       case GhostRaceArmedData(ghost: final g, tier: final t):
         return armed?.call(g, t);
-      case GhostRaceRacingData():
-        return racing?.call(this);
-      case GhostRaceFinishedData():
-        return finished?.call(this);
+      case GhostRaceRacingData(ghost: final g, tier: final t, splitComparisons: final sc, ghostPosition: final gp, deltaSeconds: final ds, projectedFinishSeconds: final pfs, currentSplitIndex: final csi):
+        return racing?.call(this as GhostRaceRacingData);
+      case GhostRaceFinishedData(ghost: final g, tier: final t, result: final r, userElapsedMs: final uem, splitComparisons: final sc):
+        return finished?.call(this as GhostRaceFinishedData);
     }
     return null;
   }
@@ -203,6 +204,7 @@ class GhostRaceRacingData extends GhostRaceStateData {
   final LatLng? ghostPosition;
   final double deltaSeconds; // user - ghost (negative = user ahead)
   final double projectedFinishSeconds;
+  final int currentSplitIndex;
 
   const GhostRaceRacingData({
     required this.ghost,
@@ -211,6 +213,7 @@ class GhostRaceRacingData extends GhostRaceStateData {
     this.ghostPosition,
     this.deltaSeconds = 0,
     this.projectedFinishSeconds = 0,
+    this.currentSplitIndex = 0,
   });
 
   GhostRaceRacingData copyWith({
@@ -218,6 +221,7 @@ class GhostRaceRacingData extends GhostRaceStateData {
     LatLng? ghostPosition,
     double? deltaSeconds,
     double? projectedFinishSeconds,
+    int? currentSplitIndex,
   }) => GhostRaceRacingData(
         ghost: ghost,
         tier: tier,
@@ -225,6 +229,7 @@ class GhostRaceRacingData extends GhostRaceStateData {
         ghostPosition: ghostPosition ?? this.ghostPosition,
         deltaSeconds: deltaSeconds ?? this.deltaSeconds,
         projectedFinishSeconds: projectedFinishSeconds ?? this.projectedFinishSeconds,
+        currentSplitIndex: currentSplitIndex ?? this.currentSplitIndex,
       );
 }
 

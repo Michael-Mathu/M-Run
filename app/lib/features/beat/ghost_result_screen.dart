@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
-import 'package:mwendo_app/features/beat/ghost_race_controller.dart';
 import 'package:mwendo_app/features/beat/ghost_race_utils.dart';
 import 'package:mwendo_app/features/learn/data/beat_legends.dart';
 import 'package:mwendo_app/widgets/mwendo_map.dart';
@@ -41,7 +41,7 @@ class GhostResultScreen extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
 
     // Parse route points
-    List<LatLng> routePoints = [];
+    List<latlong.LatLng> routePoints = [];
     try {
       final decoded = routePointsJson;
       if (decoded.isNotEmpty && decoded != '[]') {
@@ -50,7 +50,7 @@ class GhostResultScreen extends ConsumerWidget {
       }
     } catch (_) {}
 
-    return Scaffold(
+return Scaffold(
       body: CustomScrollView(
         slivers: [
           // Hero section
@@ -99,14 +99,14 @@ class GhostResultScreen extends ConsumerWidget {
                               _StatChip(
                                 icon: Icons.timer_rounded,
                                 label: L10n.tr('your_time', locale),
-                                value: formatDuration(Duration(milliseconds: userElapsedMs)),
+                                value: formatDuration(userElapsedMs),
                                 color: userWon ? Colors.white : cs.onSurface,
                               ),
                               const SizedBox(width: AppTheme.s16),
                               _StatChip(
                                 icon: Icons.emoji_events_rounded,
                                 label: L10n.tr('ghost_time', locale),
-                                value: formatDuration(Duration(seconds: activeGhost.totalSeconds)),
+                                value: formatDuration(activeGhost.totalSeconds * 1000),
                                 color: userWon ? Colors.white : cs.onSurface,
                               ),
                             ],
@@ -114,91 +114,99 @@ class GhostResultScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    Positioned(
+                      top: MediaQuery.of(context).padding.top + 8,
+                      left: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white),
+                        onPressed: () => context.go('/run'),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded),
-              onPressed: () => context.go('/run'),
             ),
           ),
 
           // Content
-          SliverPadding(
-            padding: const EdgeInsets.all(AppTheme.s24),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Map overlay
-                _ResultMap(ghost: activeGhost, routePoints: routePoints),
-                const SizedBox(height: AppTheme.s24),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.s24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Map overlay
+                  _ResultMap(ghost: activeGhost, routePoints: routePoints),
+                  const SizedBox(height: AppTheme.s24),
 
-                // Split comparison table
-                _SplitComparisonTable(
-                  ghost: activeGhost,
-                  splitComparisons: const [],
-                  userElapsedMs: userElapsedMs,
-                  locale: locale,
-                ),
-                const SizedBox(height: AppTheme.s24),
+                  // Split comparison table
+                  _SplitComparisonTable(
+                    ghost: activeGhost,
+                    splitComparisons: const [],
+                    userElapsedMs: userElapsedMs,
+                    locale: locale,
+                  ),
+                  const SizedBox(height: AppTheme.s24),
 
-                // Summary stats
-                _SummaryStats(
-                  ghost: activeGhost,
-                  userElapsedMs: userElapsedMs,
-                  splitComparisons: const [],
-                  locale: locale,
-                ),
-                const SizedBox(height: AppTheme.s24),
+                  // Summary stats
+                  _SummaryStats(
+                    ghost: activeGhost,
+                    userElapsedMs: userElapsedMs,
+                    splitComparisons: const [],
+                    locale: locale,
+                  ),
+                  const SizedBox(height: AppTheme.s24),
 
-                // Action buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // Rematch with same tier
-                          context.go('/beat/$ghostId');
-                        },
-                        icon: const Icon(Icons.replay_rounded),
-                        label: Text(L10n.tr('rematch', locale)),
-                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: AppTheme.s16)),
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.s12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          // Try harder tier
-                          final nextTier = _nextTier(tier);
-                          if (nextTier != null) {
-                            context.go('/beat/$ghostId');
-                          }
-                        },
-                        icon: const Icon(Icons.trending_up_rounded),
-                        label: Text(L10n.tr('try_harder_tier', locale)),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.brand,
-                          padding: const EdgeInsets.symmetric(vertical: AppTheme.s16),
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            // Rematch with same tier
+                            context.push('/beat/$ghostId');
+                          },
+                          icon: const Icon(Icons.replay_rounded),
+                          label: Text(L10n.tr('rematch', locale)),
+                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: AppTheme.s16)),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.s12),
-                // Share button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      // TODO: Implement share image generation
-                    },
-                    icon: const Icon(Icons.share_rounded),
-                    label: Text(L10n.tr('share_result', locale)),
-                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: AppTheme.s14)),
+                      const SizedBox(width: AppTheme.s12),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            // Try harder tier
+                            final nextTier = _nextTier(tier);
+                            if (nextTier != null) {
+                              context.push('/beat/$ghostId');
+                            }
+                          },
+                          icon: const Icon(Icons.trending_up_rounded),
+                          label: Text(L10n.tr('try_harder_tier', locale)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppTheme.brand,
+                            padding: const EdgeInsets.symmetric(vertical: AppTheme.s16),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: AppTheme.s32),
-              ]),
+                  const SizedBox(height: AppTheme.s12),
+                  // Share button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        // TODO: Implement share image generation
+                      },
+                      icon: const Icon(Icons.share_rounded),
+                      label: Text(L10n.tr('share_result', locale)),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: AppTheme.s14)),
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.s32),
+                ],
+              ),
             ),
           ),
         ],
@@ -246,7 +254,7 @@ class _StatChip extends StatelessWidget {
 
 class _ResultMap extends StatelessWidget {
   final GhostPace ghost;
-  final List<LatLng> routePoints;
+  final List<latlong.LatLng> routePoints;
 
   const _ResultMap({required this.ghost, required this.routePoints});
 
@@ -285,9 +293,6 @@ class _SplitComparisonTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    final totalDistanceM = ghost.distanceKm * 1000;
-    final splitCount = ghost.splits.length;
-    final splitDistanceKm = ghost.distanceKm / splitCount;
 
     return Container(
       decoration: BoxDecoration(
@@ -323,7 +328,7 @@ class _SplitComparisonTable extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: splitComparisons.length,
-            separatorBuilder: (_, __) => Divider(height: 1, color: cs.onSurface.withValues(alpha: 0.1)),
+            separatorBuilder: (_, _) => Divider(height: 1, color: cs.onSurface.withValues(alpha: 0.1)),
             itemBuilder: (context, index) {
               final split = splitComparisons[index];
               final userSplitTime = split.userProjectedSplitTime;
@@ -392,10 +397,10 @@ class _SummaryStats extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _SummaryTile(
+child: _SummaryTile(
                   icon: Icons.timer_rounded,
                   label: L10n.tr('your_time', locale),
-                  value: formatDuration(Duration(milliseconds: userElapsedMs)),
+                  value: formatDuration(userElapsedMs),
                   color: AppTheme.brand,
                 ),
               ),
@@ -403,7 +408,7 @@ class _SummaryStats extends StatelessWidget {
                 child: _SummaryTile(
                   icon: Icons.emoji_events_rounded,
                   label: L10n.tr('ghost_time', locale),
-                  value: formatDuration(Duration(seconds: ghost.totalSeconds)),
+                  value: formatDuration(ghost.totalSeconds * 1000),
                   color: ghost.accent,
                 ),
               ),

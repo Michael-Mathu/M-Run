@@ -246,7 +246,7 @@ class LegendDetailPage extends ConsumerWidget {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: () => context.go('/beat/${l.beatLegendId}'),
+                      onPressed: () => context.push('/beat/${l.beatLegendId}'),
                       icon: const Icon(Icons.speed_rounded),
                       label: Text(L10n.tr('challenge_me', locale)),
                       style: FilledButton.styleFrom(backgroundColor: accent),

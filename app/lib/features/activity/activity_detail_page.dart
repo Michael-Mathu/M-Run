@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
@@ -62,7 +63,7 @@ class ActivityDetailPage extends ConsumerWidget {
           SliverToBoxAdapter(
             child: SizedBox(
               height: 260,
-              child: RouteMap(points: a.route),
+              child: RouteMap(points: a.route.map((p) => latlong.LatLng(p.latitude, p.longitude)).toList()),
             ),
           ),
           SliverPadding(

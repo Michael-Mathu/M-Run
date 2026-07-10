@@ -267,7 +267,7 @@ class _BeatTeaser extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(AppTheme.r16),
-          onTap: () => context.go('/beat'),
+          onTap: () => context.push('/beat'),
           child: Padding(
             padding: const EdgeInsets.all(AppTheme.s16),
             child: Row(

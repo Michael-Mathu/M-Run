@@ -5,7 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' as latlong;
-import 'package:maplibre_gl/maplibre_gl.dart' hide LatLng;
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/features/beat/ghost_race_controller.dart';
@@ -132,7 +132,7 @@ class _MwendoMapState extends State<MwendoMap> {
         _firstFixDone = true;
         _autoFollow = true;
         _ctrl?.animateCamera(
-          CameraUpdate.newLatLngZoom(widget.points.first, 16),
+          CameraUpdate.newLatLngZoom(_toMlLatLng(widget.points.first), 16),
         );
       }
       _syncRoute();
@@ -154,10 +154,10 @@ class _MwendoMapState extends State<MwendoMap> {
       _clearLine();
       return;
     }
-    final coords = List<latlong.LatLng>.from(widget.points);
+    final coords = _toMlLatLngList(widget.points);
 
     if (_isSyncing) {
-      _pendingCoords = coords;
+      _pendingCoords = widget.points;
       return;
     }
 
@@ -173,6 +173,12 @@ class _MwendoMapState extends State<MwendoMap> {
     });
   }
 
+  LatLng _toMlLatLng(latlong.LatLng ll) => LatLng(ll.latitude, ll.longitude);
+
+  List<LatLng> _toMlLatLngList(List<latlong.LatLng> points) {
+    return points.map(_toMlLatLng).toList();
+  }
+
   Future<void> _clearLine() async {
     final ctrl = _ctrl;
     if (ctrl == null || _line == null) return;
@@ -185,7 +191,7 @@ class _MwendoMapState extends State<MwendoMap> {
     }
   }
 
-  Future<void> _drawRoute(List<latlong.LatLng> coords) async {
+  Future<void> _drawRoute(List<LatLng> coords) async {
     final ctrl = _ctrl;
     if (ctrl == null || coords.length < 2) return;
 
@@ -220,7 +226,7 @@ class _MwendoMapState extends State<MwendoMap> {
     }
   }
 
-  LineOptions _routeOptions(List<latlong.LatLng> coords) => LineOptions(
+  LineOptions _routeOptions(List<LatLng> coords) => LineOptions(
         geometry: coords,
         lineColor: _kRouteColor,
         lineWidth: _kRouteWidth,
@@ -239,11 +245,11 @@ class _MwendoMapState extends State<MwendoMap> {
     // Draw ghost route polyline (dashed) if not already drawn
     if (_ghostLine == null) {
       _ghostLine = await ctrl.addLine(LineOptions(
-        geometry: routePoints,
+        geometry: _toMlLatLngList(routePoints),
         lineColor: _kGhostRouteColor,
         lineWidth: _kGhostRouteWidth,
         lineOpacity: _kGhostRouteOpacity,
-        linePattern: [10, 10], // dashed pattern
+        linePattern: 'dash', // dashed pattern
       ));
     }
 
@@ -258,17 +264,17 @@ class _MwendoMapState extends State<MwendoMap> {
       // Update or create ghost marker
       if (_ghostMarker == null) {
         _ghostMarker = await ctrl.addSymbol(SymbolOptions(
-          geometry: ghostPos,
+          geometry: _toMlLatLng(ghostPos),
           iconImage: 'marker',
           iconSize: 1.2,
           iconColor: _kGhostMarkerColor,
-          iconHaloColor: Colors.white.value,
+          iconHaloColor: '#FFFFFF',
           iconHaloWidth: 2,
           iconHaloBlur: 4,
         ));
       } else {
         await ctrl.updateSymbol(_ghostMarker!, SymbolOptions(
-          geometry: ghostPos,
+          geometry: _toMlLatLng(ghostPos),
         ));
 
         // Animate pulse effect via iconSize
@@ -294,15 +300,15 @@ class _MwendoMapState extends State<MwendoMap> {
     setState(() => _autoFollow = true);
     final ctrl = _ctrl;
     if (ctrl != null && widget.points.isNotEmpty) {
-      ctrl.animateCamera(CameraUpdate.newLatLng(widget.points.last));
+      ctrl.animateCamera(CameraUpdate.newLatLng(_toMlLatLng(widget.points.last)));
     }
   }
 
   @override
   void dispose() {
-    _ctrl?.removeLine(_line);
-    _ctrl?.removeLine(_ghostLine);
-    _ctrl?.removeSymbol(_ghostMarker);
+    if (_line != null) _ctrl?.removeLine(_line!);
+    if (_ghostLine != null) _ctrl?.removeLine(_ghostLine!);
+    if (_ghostMarker != null) _ctrl?.removeSymbol(_ghostMarker!);
     super.dispose();
   }
 
@@ -314,8 +320,9 @@ class _MwendoMapState extends State<MwendoMap> {
       return _EmptyRoutePlaceholder();
     }
 
-    final initialTarget =
-        widget.points.isNotEmpty ? widget.points.last : kDefaultCenter;
+    final initialTarget = widget.points.isNotEmpty
+        ? _toMlLatLng(widget.points.last)
+        : _toMlLatLng(kDefaultCenter);
 
     final map = MapLibreMap(
       // Keep the key stable: MapLibre GL cannot hot-swap the style URL, and a

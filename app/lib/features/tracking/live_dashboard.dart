@@ -1,7 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:mwendo_app/core/permissions/location_permission.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
@@ -24,6 +25,7 @@ import 'package:mwendo_app/widgets/celebration_overlay.dart';
 import 'package:mwendo_app/widgets/metric_tile.dart';
 import 'package:mwendo_app/widgets/mwendo_map.dart';
 import 'package:mwendo_gps_engine/mwendo_gps_engine.dart';
+import 'package:go_router/go_router.dart';
 
 class LiveDashboard extends ConsumerStatefulWidget {
   const LiveDashboard({super.key});
@@ -108,7 +110,7 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                               in ref
                                   .read(trackingModelProvider.notifier)
                                   .displayPoints)
-                            LatLng(p.lat, p.lng),
+                            latlong.LatLng(p.lat, p.lng),
                         ],
                         mode: MapMode.live,
                         locationEnabled: _hasLocationPermission,
@@ -116,15 +118,13 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                         ghost: ghostRace.maybeWhen(
                           racing: (r) => r.ghost,
                           armed: (g, _) => g,
-                          finished: (g, _, _, _, _) => g,
-                          orElse: () => null,
+                          finished: (g) => g.ghost,
                         ),
                         userDistanceM: m.distanceM,
                         raceState: ghostRace.maybeWhen(
                           racing: (r) => GhostRaceState.racing,
                           armed: (_, _) => GhostRaceState.armed,
-                          finished: (_, _, _, _, _) => GhostRaceState.finished,
-                          orElse: () => GhostRaceState.idle,
+                          finished: (g) => GhostRaceState.finished,
                         ),
                       ),
                     ),
@@ -149,8 +149,8 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                           left: AppTheme.s16,
                           child: _GhostChipArmed(ghost: ghost, tier: tier),
                         ),
-                        orElse: () => const SizedBox.shrink(),
-                      ),
+                        idle: () => const SizedBox.shrink(),
+                      ) ?? const SizedBox.shrink(),
                     Positioned(
                       top: MediaQuery.of(context).padding.top + AppTheme.s12,
                       right: AppTheme.s16,
@@ -393,8 +393,7 @@ children: [
     final ghost = ghostRaceState.maybeWhen(
       racing: (r) => r.ghost,
       armed: (g, _) => g,
-      finished: (g, _, _, _, _) => g,
-      orElse: () => null,
+      finished: (g) => g.ghost,
     );
 
     await ref.read(trackingModelProvider.notifier).stop();
@@ -466,7 +465,7 @@ children: [
         final ghostRaceFinal = ref.read(ghostRaceControllerProvider);
         ghostRaceFinal.maybeWhen(
           finished: (finished) {
-            context.go('/ghost-result/${ghost.id}', extra: {
+            GoRouter.of(context).go('/ghost-result/${ghost.id}', extra: {
               'tier': finished.tier.name,
               'won': finished.result == GhostRaceResult.win,
               'elapsedMs': finished.userElapsedMs,
@@ -481,7 +480,6 @@ children: [
               'routePoints': trackPoints.map((p) => {'lat': p.lat, 'lng': p.lng}).toList(),
             });
           },
-          orElse: () {},
         );
       }
 

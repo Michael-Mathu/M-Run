@@ -17,6 +17,8 @@ class GhostDrawer extends ConsumerWidget {
     final locale = ref.watch(localeProvider);
 
     return state.maybeWhen(
+      idle: () => const SizedBox.shrink(),
+      armed: (ghost, tier) => const SizedBox.shrink(),
       racing: (racing) => DraggableScrollableSheet(
         initialChildSize: 0.35,
         minChildSize: 0.2,
@@ -68,8 +70,8 @@ class GhostDrawer extends ConsumerWidget {
           ),
         ),
       ),
-      orElse: () => const SizedBox.shrink(),
-    );
+      finished: (finished) => const SizedBox.shrink(),
+    ) ?? const SizedBox.shrink();
   }
 }
 
@@ -276,7 +278,7 @@ class _ProjectedFooter extends StatelessWidget {
                   style: text.labelSmall!.copyWith(color: cs.onSurfaceVariant),
                 ),
                 Text(
-                  formatDuration(Duration(seconds: projectedFinishSeconds.round())),
+                  formatSeconds(projectedFinishSeconds),
                   style: text.titleMedium!.copyWith(fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()]),
                 ),
               ],
@@ -288,7 +290,7 @@ class _ProjectedFooter extends StatelessWidget {
             children: [
               Text(L10n.tr('ghost_finish', locale), style: text.labelSmall!.copyWith(color: cs.onSurfaceVariant)),
               Text(
-                formatDuration(Duration(seconds: ghost.totalSeconds)),
+                formatSeconds(ghost.totalSeconds.toDouble()),
                 style: text.bodyMedium!.copyWith(fontWeight: FontWeight.w600, fontFeatures: const [FontFeature.tabularFigures()]),
               ),
             ],

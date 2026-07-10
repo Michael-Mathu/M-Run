@@ -240,6 +240,53 @@ class L10n {
     'legends_teaser_sub': {'en': 'Keino to Kipyegon — their stories, records and quotes.', 'sw': 'Keino hadi Kipyegon — hadithi, rekodi na quote zao.'},
     'race_ghost_legend': {'en': 'Race a ghost legend', 'sw': 'Shindana na mzuka wa hadithi'},
     'race_ghost_sub': {'en': 'Pit your pace against Kipchoge, Kipyegon and more.', 'sw': 'Pima kasi yako dhidi ya Kipchoge, Kipyegon na wengine.'},
+
+    // ---- Kiswahili localisation audit (hardcoded string sweep) ----
+    // Legend detail sections
+    'biography': {'en': 'Biography', 'sw': 'Wasifu'},
+    'personal_bests': {'en': 'Personal Bests', 'sw': 'Rekodi Binafsi'},
+    'how_you_compare': {'en': 'How You Compare', 'sw': 'Ulinganisho Wako'},
+    'career_timeline': {'en': 'Career Timeline', 'sw': 'Ratiba ya Kazi'},
+    'records': {'en': 'Records', 'sw': 'Rekodi'},
+    'training_philosophy': {'en': 'Training Philosophy', 'sw': 'Falsafa ya Mazoezi'},
+    'rivalries': {'en': 'Rivalries', 'sw': 'Ushindani'},
+    'notable_races': {'en': 'Notable Races', 'sw': 'Mbio Maarufu'},
+    'in_their_words': {'en': 'In Their Words', 'sw': 'Kwa Maneno Yao'},
+    'related_legends': {'en': 'Related Legends', 'sw': 'Mashujaa Wanaohusiana'},
+    'quote': {'en': 'Quote', 'sw': 'Nukuu'},
+    'vs': {'en': 'vs', 'sw': 'dhidi ya'},
+    'no_distance_logged': {'en': 'No {label} logged yet', 'sw': 'Hakuna {label} iliyorekodiwa bado'},
+    // Lessons
+    'lesson': {'en': 'Lesson', 'sw': 'Somo'},
+    'lesson_complete_xp': {'en': 'Lesson complete · +15 XP', 'sw': 'Somo limekamilika · +15 XP'},
+    // Activity detail
+    'activity_not_found': {'en': 'Activity not found', 'sw': 'Shughuli haikupatikana'},
+    'activity_not_found_body': {
+      'en': 'This activity may have been deleted or was never synced.',
+      'sw': 'Shughuli hii huenda ilifutwa au haikuwahi kusawazishwa.'
+    },
+    // Beat the legends
+    'avg': {'en': 'Avg', 'sw': 'Wastani'},
+    'target': {'en': 'target', 'sw': 'lengo'},
+    // Level ring / badges
+    'lv': {'en': 'LV', 'sw': 'LV'},
+    // Legend of the day card
+    'read_more': {'en': 'Read more', 'sw': 'Soma zaidi'},
+    'legend_of_week': {'en': 'LEGEND OF THE WEEK', 'sw': 'SHUJAA WA WIKI'},
+    'did_you_know': {'en': 'DID YOU KNOW?', 'sw': 'JE, WAJUA?'},
+    // Course detail
+    'by': {'en': 'By', 'sw': 'Na'},
+    'of': {'en': 'of', 'sw': 'kati ya'},
+    'lessons_complete': {'en': 'lessons complete', 'sw': 'masomo yamekamilika'},
+    // Challenge library header
+    'total_xp': {'en': 'total XP', 'sw': 'jumla ya XP'},
+    'challenges_done': {'en': 'challenges done', 'sw': 'changamoto zimekamilika'},
+    // Leaderboard
+    'you': {'en': 'You', 'sw': 'Wewe'},
+    // Profile photo sheet
+    'camera': {'en': 'Camera', 'sw': 'Kamera'},
+    'gallery': {'en': 'Gallery', 'sw': 'Ghala'},
+    'remove_photo': {'en': 'Remove photo', 'sw': 'Ondoa picha'},
   };
 
   static String tr(String key, AppLocale locale) {

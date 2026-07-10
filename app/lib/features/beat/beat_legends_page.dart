@@ -92,7 +92,7 @@ class _BeatLegendsPageState extends ConsumerState<BeatLegendsPage> {
             padding: const EdgeInsets.symmetric(horizontal: AppTheme.s24),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                _GhostHeader(g: _active),
+                _GhostHeader(g: _active, locale: locale),
                 const SizedBox(height: AppTheme.s16),
                 Container(
                   padding: const EdgeInsets.all(AppTheme.s16),
@@ -144,7 +144,8 @@ class _BeatLegendsPageState extends ConsumerState<BeatLegendsPage> {
 
 class _GhostHeader extends StatelessWidget {
   final GhostPace g;
-  const _GhostHeader({required this.g});
+  final AppLocale locale;
+  const _GhostHeader({required this.g, required this.locale});
 
   @override
   Widget build(BuildContext context) {
@@ -170,10 +171,10 @@ class _GhostHeader extends StatelessWidget {
               children: [
                 Text(g.name, style: text.titleLarge!.copyWith(color: Colors.white)),
                 const SizedBox(height: AppTheme.s4),
-                Text('${g.distanceLabel} · target ${formatDuration(g.totalSeconds)}',
+                Text('${g.distanceLabel} · ${L10n.tr('target', locale)} ${formatDuration(g.totalSeconds)}',
                     style: text.bodyMedium!.copyWith(color: Colors.white.withValues(alpha: 0.92))),
                 const SizedBox(height: AppTheme.s2),
-                Text('Avg ${formatPace(g.avgPaceMinPerKm)} /km',
+                Text('${L10n.tr('avg', locale)} ${formatPace(g.avgPaceMinPerKm)} /km',
                     style: text.labelMedium!.copyWith(color: Colors.white.withValues(alpha: 0.92))),
               ],
             ),

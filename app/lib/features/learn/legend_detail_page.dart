@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
 import 'package:mwendo_app/core/navigation/navigation.dart';
@@ -36,6 +37,7 @@ class LegendDetailPage extends ConsumerWidget {
     final accent = legendAccent(l);
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final locale = ref.watch(localeProvider);
     final runsAsync = ref.watch(activitiesProvider);
 
     return Scaffold(
@@ -95,14 +97,14 @@ class LegendDetailPage extends ConsumerWidget {
             padding: const EdgeInsets.all(AppTheme.s24),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                Text('Biography', style: text.titleLarge),
+                Text(L10n.tr('biography', locale), style: text.titleLarge),
                 const SizedBox(height: AppTheme.s8),
                 Text(l.bio, style: text.bodyLarge!.copyWith(height: 1.6)),
                 const SizedBox(height: AppTheme.s24),
 
                 // ---- Personal Bests ----
                 if (l.personalBests != null) ...[
-                  Text('Personal Bests', style: text.titleLarge),
+                  Text(L10n.tr('personal_bests', locale), style: text.titleLarge),
                   const SizedBox(height: AppTheme.s12),
                   Wrap(
                     spacing: AppTheme.s12,
@@ -115,26 +117,26 @@ class LegendDetailPage extends ConsumerWidget {
                 ],
 
                 // ---- How You Compare (Step 5) ----
-                Text('How You Compare', style: text.titleLarge),
+                Text(L10n.tr('how_you_compare', locale), style: text.titleLarge),
                 const SizedBox(height: AppTheme.s12),
                 runsAsync.when(
                   loading: () => const SizedBox(
                     height: 80,
                     child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                   ),
-                  error: (_, _) => _CompareEmpty(onStart: () => context.go('/run')),
-                  data: (runs) => _HowYouCompare(legend: l, runs: runs, accent: accent),
+                  error: (_, _) => _CompareEmpty(onStart: () => context.go('/run'), locale: locale),
+                  data: (runs) => _HowYouCompare(legend: l, runs: runs, accent: accent, locale: locale),
                 ),
                 const SizedBox(height: AppTheme.s24),
 
                 // ---- Career Timeline ----
-                Text('Career Timeline', style: text.titleLarge),
+                Text(L10n.tr('career_timeline', locale), style: text.titleLarge),
                 const SizedBox(height: AppTheme.s12),
                 ...l.timeline.map((m) => _TimelineRow(year: m.year, text: m.text, accent: accent)),
                 const SizedBox(height: AppTheme.s24),
 
                 // ---- Records ----
-                Text('Records', style: text.titleLarge),
+                Text(L10n.tr('records', locale), style: text.titleLarge),
                 const SizedBox(height: AppTheme.s12),
                 ...l.records.map((r) => Padding(
                       padding: const EdgeInsets.only(bottom: AppTheme.s8),
@@ -150,7 +152,7 @@ class LegendDetailPage extends ConsumerWidget {
 
                 // ---- Training Philosophy (Step 8) ----
                 if (l.trainingPhilosophy != null) ...[
-                  Text('Training Philosophy', style: text.titleLarge),
+                  Text(L10n.tr('training_philosophy', locale), style: text.titleLarge),
                   const SizedBox(height: AppTheme.s12),
                   Container(
                     padding: const EdgeInsets.all(AppTheme.s16),
@@ -175,7 +177,7 @@ class LegendDetailPage extends ConsumerWidget {
                         ),
                         if (l.relatedCourseSlug != null) ...[
                           const SizedBox(height: AppTheme.s12),
-                          _CourseLinkChip(slug: l.relatedCourseSlug!, accent: accent),
+                          _CourseLinkChip(slug: l.relatedCourseSlug!, accent: accent, locale: locale),
                         ],
                       ],
                     ),
@@ -185,7 +187,7 @@ class LegendDetailPage extends ConsumerWidget {
 
                 // ---- Rivalries ----
                 if (l.rivals.isNotEmpty) ...[
-                  Text('Rivalries', style: text.titleLarge),
+                  Text(L10n.tr('rivalries', locale), style: text.titleLarge),
                   const SizedBox(height: AppTheme.s12),
                   Wrap(
                     spacing: AppTheme.s8,
@@ -199,7 +201,7 @@ class LegendDetailPage extends ConsumerWidget {
 
                 // ---- Notable Races ----
                 if (l.notableRaces != null) ...[
-                  Text('Notable Races', style: text.titleLarge),
+                  Text(L10n.tr('notable_races', locale), style: text.titleLarge),
                   const SizedBox(height: AppTheme.s12),
                   ...l.notableRaces!.map((race) => Container(
                         margin: const EdgeInsets.only(bottom: AppTheme.s12),
@@ -224,13 +226,13 @@ class LegendDetailPage extends ConsumerWidget {
                 ],
 
                 // ---- Quotes (expanded with categories) ----
-                Text('In Their Words', style: text.titleLarge),
+                Text(L10n.tr('in_their_words', locale), style: text.titleLarge),
                 const SizedBox(height: AppTheme.s12),
                 ...l.quotes.map((q) => _QuoteCard(text: q, accent: accent)),
                 if (l.quotesExtra != null)
                   ...l.quotesExtra!.map((q) {
                     final meta = LegendQuote.categoryMeta[q.category] ??
-                        (Icons.format_quote_rounded, 'Quote');
+                        (Icons.format_quote_rounded, L10n.tr('quote', locale));
                     return _QuoteCard(
                       text: q.text,
                       accent: accent,
@@ -246,7 +248,7 @@ class LegendDetailPage extends ConsumerWidget {
                     child: FilledButton.icon(
                       onPressed: () => context.go('/beat/${l.beatLegendId}'),
                       icon: const Icon(Icons.speed_rounded),
-                      label: const Text('Challenge me'),
+                      label: Text(L10n.tr('challenge_me', locale)),
                       style: FilledButton.styleFrom(backgroundColor: accent),
                     ),
                   ),
@@ -279,7 +281,7 @@ class LegendDetailPage extends ConsumerWidget {
 
                 // ---- Related Legends carousel ----
                 if (l.related.isNotEmpty) ...[
-                  Text('Related Legends', style: text.titleLarge),
+                  Text(L10n.tr('related_legends', locale), style: text.titleLarge),
                   const SizedBox(height: AppTheme.s12),
                   SizedBox(
                     height: 132,
@@ -336,7 +338,8 @@ class _BestCard extends StatelessWidget {
 class _CourseLinkChip extends StatelessWidget {
   final String slug;
   final Color accent;
-  const _CourseLinkChip({required this.slug, required this.accent});
+  final AppLocale locale;
+  const _CourseLinkChip({required this.slug, required this.accent, required this.locale});
 
   @override
   Widget build(BuildContext context) {
@@ -355,7 +358,7 @@ class _CourseLinkChip extends StatelessWidget {
           children: [
             Icon(course.category.icon, color: course.category.accent, size: 16),
             const SizedBox(width: AppTheme.s6),
-            Text('Learn: ${course.title}',
+            Text('${L10n.tr('learn', locale)}: ${course.title}',
                 style: Theme.of(context).textTheme.labelMedium!.copyWith(color: course.category.accent)),
           ],
         ),
@@ -491,7 +494,8 @@ class _RelatedCard extends StatelessWidget {
 
 class _CompareEmpty extends StatelessWidget {
   final VoidCallback onStart;
-  const _CompareEmpty({required this.onStart});
+  final AppLocale locale;
+  const _CompareEmpty({required this.onStart, required this.locale});
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -507,17 +511,17 @@ class _CompareEmpty extends StatelessWidget {
         children: [
           Icon(Icons.route_rounded, size: 32, color: cs.onSurface.withValues(alpha: 0.3)),
           const SizedBox(height: AppTheme.s8),
-          Text('Start running to compare!',
+          Text(L10n.tr('start_running_to_compare', locale),
               style: text.titleMedium, textAlign: TextAlign.center),
           const SizedBox(height: AppTheme.s4),
-          Text('Log a 5K, 10K, half or marathon and see how you stack up.',
+          Text(L10n.tr('log_distance_to_compare', locale),
               style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
               textAlign: TextAlign.center),
           const SizedBox(height: AppTheme.s12),
           FilledButton.icon(
             onPressed: onStart,
             icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('Go for a run'),
+            label: Text(L10n.tr('go_for_a_run', locale)),
             style: FilledButton.styleFrom(backgroundColor: AppTheme.brand),
           ),
         ],
@@ -530,7 +534,8 @@ class _HowYouCompare extends StatelessWidget {
   final Legend legend;
   final List<RunRecord> runs;
   final Color accent;
-  const _HowYouCompare({required this.legend, required this.runs, required this.accent});
+  final AppLocale locale;
+  const _HowYouCompare({required this.legend, required this.runs, required this.accent, required this.locale});
 
   @override
   Widget build(BuildContext context) {
@@ -560,11 +565,12 @@ class _HowYouCompare extends StatelessWidget {
         userMs: userMs,
         legendSeconds: legendSeconds,
         accent: accent,
+        locale: locale,
       ));
     }
 
     if (rows.isEmpty) {
-      return _CompareEmpty(onStart: () => context.go('/run'));
+      return _CompareEmpty(onStart: () => context.go('/run'), locale: locale);
     }
     return Column(children: rows);
   }
@@ -576,12 +582,14 @@ class _CompareRow extends StatelessWidget {
   final int? userMs;
   final double legendSeconds;
   final Color accent;
+  final AppLocale locale;
   const _CompareRow({
     required this.label,
     required this.legendTime,
     required this.userMs,
     required this.legendSeconds,
     required this.accent,
+    required this.locale,
   });
 
   @override
@@ -596,7 +604,7 @@ class _CompareRow extends StatelessWidget {
           children: [
             SizedBox(width: 92, child: Text(label, style: text.labelMedium!.copyWith(fontWeight: FontWeight.w700))),
             Expanded(
-              child: Text('No $label logged yet',
+              child: Text(L10n.tr('no_distance_logged', locale).replaceFirst('{label}', label),
                   style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.5))),
             ),
             Text(legendTime, style: text.bodySmall!.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
@@ -621,7 +629,7 @@ class _CompareRow extends StatelessWidget {
                 child: Text(formatDuration(userMs!),
                     style: text.bodyMedium!.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
               ),
-              Text('vs $legendTime',
+              Text('${L10n.tr('vs', locale)} $legendTime',
                   style: text.bodySmall!.copyWith(
                       color: accent, fontFeatures: const [FontFeature.tabularFigures()])),
               const SizedBox(width: AppTheme.s8),

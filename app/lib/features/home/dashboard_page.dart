@@ -218,7 +218,7 @@ class _TopBar extends StatelessWidget {
               color: AppTheme.brand.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(AppTheme.rFull),
             ),
-            child: Text('LV ${g.level}', style: text.labelMedium!.copyWith(color: AppTheme.brand)),
+            child: Text('${L10n.tr('lv', locale)} ${g.level}', style: text.labelMedium!.copyWith(color: AppTheme.brand)),
           ),
         ),
       ],

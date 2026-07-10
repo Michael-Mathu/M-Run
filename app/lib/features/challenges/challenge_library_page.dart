@@ -99,6 +99,7 @@ class _LevelHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final g = ref.watch(gamificationProvider);
+    final locale = ref.watch(localeProvider);
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     return Container(
@@ -116,7 +117,7 @@ class _LevelHeader extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Level ${g.level} · ${g.title}',
+                Text('${L10n.tr('level', locale)} ${g.level} · ${g.title}',
                     style: text.titleMedium),
                 const SizedBox(height: AppTheme.s8),
                 XpBar(
@@ -125,7 +126,7 @@ class _LevelHeader extends ConsumerWidget {
                   progress: g.levelProgress,
                 ),
                 const SizedBox(height: AppTheme.s8),
-                Text('${g.xp} total XP · ${g.completedChallenges.length} challenges done',
+                Text('${g.xp} ${L10n.tr('total_xp', locale)} · ${g.completedChallenges.length} ${L10n.tr('challenges_done', locale)}',
                     style: text.labelSmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
               ],
             ),

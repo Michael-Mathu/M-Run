@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mwendo_app/core/gamification/gamification_provider.dart';
+import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/features/learn/data/courses.dart';
@@ -14,6 +15,7 @@ class CourseDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final course = courseForSlug(slug);
     final g = ref.watch(gamificationProvider);
+    final locale = ref.watch(localeProvider);
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final done = g.lessonsCompletedIn(course.slug);
@@ -45,7 +47,7 @@ class CourseDetailPage extends ConsumerWidget {
                       const SizedBox(height: AppTheme.s12),
                       Text(course.subtitle, style: text.titleMedium),
                       const SizedBox(height: AppTheme.s8),
-                      Text('By ${course.author} · ${course.minutes} min', style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
+                      Text('${L10n.tr('by', locale)} ${course.author} · ${course.minutes} min', style: text.bodySmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
                       const SizedBox(height: AppTheme.s16),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(AppTheme.rFull),
@@ -57,7 +59,7 @@ class CourseDetailPage extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: AppTheme.s6),
-                      Text('$done of ${course.lessons.length} lessons complete',
+                      Text('$done ${L10n.tr('of', locale)} ${course.lessons.length} ${L10n.tr('lessons_complete', locale)}',
                           style: text.labelSmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
                     ],
                   ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mwendo_app/core/gamification/gamification_provider.dart';
+import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/features/learn/data/courses.dart';
@@ -22,12 +23,13 @@ class _LessonPageState extends ConsumerState<LessonPage> {
     final g = ref.watch(gamificationProvider);
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final locale = ref.watch(localeProvider);
     final done = g.isLessonDone(course.slug, widget.index);
 
     return Scaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
-        title: Text('Lesson ${widget.index + 1}'),
+        title: Text('${L10n.tr('lesson', locale)} ${widget.index + 1}'),
         centerTitle: false,
         backgroundColor: Colors.transparent,
       ),
@@ -86,7 +88,7 @@ class _LessonPageState extends ConsumerState<LessonPage> {
                         if (fresh && mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: const Text('Lesson complete · +15 XP'),
+                              content: Text(L10n.tr('lesson_complete_xp', locale)),
                               behavior: SnackBarBehavior.floating,
                               backgroundColor: Theme.of(context).snackBarTheme.backgroundColor,
                             ),
@@ -94,7 +96,7 @@ class _LessonPageState extends ConsumerState<LessonPage> {
                         }
                       },
                 icon: Icon(done ? Icons.check_circle_rounded : Icons.check_rounded),
-                label: Text(done ? 'Completed' : 'Mark complete'),
+                label: Text(done ? L10n.tr('completed', locale) : L10n.tr('mark_complete', locale)),
                 style: FilledButton.styleFrom(
                   backgroundColor: done ? cs.surfaceContainerHighest : AppTheme.brand,
                   foregroundColor: done ? cs.onSurface.withValues(alpha: 0.6) : Colors.white,

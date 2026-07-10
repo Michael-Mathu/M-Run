@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/features/learn/data/legends.dart';
 
@@ -51,7 +52,7 @@ class LegendOfDayCard extends ConsumerWidget {
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(AppTheme.rFull),
                 ),
-                child: Text(weekly ? 'LEGEND OF THE WEEK' : 'DID YOU KNOW?',
+                child: Text(weekly ? ref.tr('legend_of_week') : ref.tr('did_you_know'),
                     style: text.labelSmall!.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
               ),
             ],
@@ -90,7 +91,7 @@ class LegendOfDayCard extends ConsumerWidget {
             child: TextButton.icon(
               onPressed: () => context.go('/learn/legends/${legend.slug}'),
               icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white),
-              label: const Text('Read more', style: TextStyle(color: Colors.white)),
+              label: Text(ref.tr('read_more'), style: const TextStyle(color: Colors.white)),
               style: TextButton.styleFrom(foregroundColor: Colors.white),
             ),
           ),

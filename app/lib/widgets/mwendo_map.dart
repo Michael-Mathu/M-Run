@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 
 /// Free, key-less, globally-available Carto dark basemap. Works everywhere
@@ -377,9 +379,9 @@ class _ZoomButton extends StatelessWidget {
 }
 
 /// Shown by replay maps when there is no route to draw.
-class _EmptyRoutePlaceholder extends StatelessWidget {
+class _EmptyRoutePlaceholder extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: const BoxDecoration(
         gradient: RadialGradient(
@@ -388,13 +390,13 @@ class _EmptyRoutePlaceholder extends StatelessWidget {
           colors: [Color(0xFF1B2733), Color(0xFF0B0B0C)],
         ),
       ),
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.explore_outlined, size: 40, color: Colors.white24),
-            SizedBox(height: AppTheme.s8),
-            Text('No route recorded', style: TextStyle(color: Colors.white38)),
+            const Icon(Icons.explore_outlined, size: 40, color: Colors.white24),
+            const SizedBox(height: AppTheme.s8),
+            Text(ref.tr('no_route_recorded'), style: const TextStyle(color: Colors.white38)),
           ],
         ),
       ),

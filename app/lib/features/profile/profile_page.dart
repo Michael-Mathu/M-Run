@@ -59,17 +59,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final g = ref.watch(gamificationProvider);
+    final locale = ref.watch(localeProvider);
     if (g.level > _prevLevel && _prevLevel > 0) {
       _prevLevel = g.level;
       Haptics.celebrate();
-      _levelUpTitle = 'Level ${g.level}';
+      _levelUpTitle = '${L10n.tr('level', locale)} ${g.level}';
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _showLevelUp = true);
       });
     } else {
       _prevLevel = g.level;
     }
-    final locale = ref.watch(localeProvider);
     final mode = ref.watch(themeModeProvider);
     final profile = ref.watch(userProfileProvider);
     final units = ref.watch(unitsProvider);
@@ -123,7 +123,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(profile.username, style: text.headlineLarge),
-                                  Text('Level ${g.level} · ${g.title}',
+                                  Text('${L10n.tr('level', locale)} ${g.level} · ${g.title}',
                                       style: text.bodyMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
                                 ],
                               ),
@@ -228,7 +228,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       ],
                       SectionTitle('${L10n.tr('leaderboard', locale)} · Rank #$rank'),
                       const SizedBox(height: AppTheme.s12),
-                      ...board.map((e) => _LeaderRow(e: e, text: text, cs: cs)),
+                      ...board.map((e) => _LeaderRow(e: e, text: text, cs: cs, locale: locale)),
                       const SizedBox(height: AppTheme.s28),
                       SectionTitle(L10n.tr('account', locale)),
                       const SizedBox(height: AppTheme.s12),
@@ -522,7 +522,8 @@ class _LeaderRow extends StatelessWidget {
   final LeaderboardEntry e;
   final TextTheme text;
   final ColorScheme cs;
-  const _LeaderRow({required this.e, required this.text, required this.cs});
+  final AppLocale locale;
+  const _LeaderRow({required this.e, required this.text, required this.cs, required this.locale});
 
   @override
   Widget build(BuildContext context) {
@@ -537,7 +538,7 @@ class _LeaderRow extends StatelessWidget {
         children: [
           Text(e.flag, style: const TextStyle(fontSize: 18)),
           const SizedBox(width: AppTheme.s12),
-          Expanded(child: Text(e.name, style: text.titleMedium)),
+          Expanded(child: Text(e.you ? L10n.tr('you', locale) : e.name, style: text.titleMedium)),
           Text('${e.xp} XP', style: text.labelMedium!.copyWith(color: cs.onSurface.withValues(alpha: 0.7))),
         ],
       ),
@@ -716,6 +717,7 @@ class _EditNameSheet {
 class _EditPhotoSheet {
   static void show(BuildContext context, WidgetRef ref) {
     final picker = ImagePicker();
+    final locale = ref.read(localeProvider);
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -728,7 +730,7 @@ class _EditPhotoSheet {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera_rounded),
-              title: const Text('Camera'),
+              title: Text(L10n.tr('camera', locale)),
               onTap: () async {
                 final img = await picker.pickImage(source: ImageSource.camera);
                 if (img != null) {
@@ -739,7 +741,7 @@ class _EditPhotoSheet {
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_rounded),
-              title: const Text('Gallery'),
+              title: Text(L10n.tr('gallery', locale)),
               onTap: () async {
                 final img = await picker.pickImage(source: ImageSource.gallery);
                 if (img != null) {
@@ -751,7 +753,7 @@ class _EditPhotoSheet {
             if (ref.read(userProfileProvider).photoPath != null)
               ListTile(
                 leading: const Icon(Icons.delete_outline_rounded),
-                title: const Text('Remove photo'),
+                title: Text(L10n.tr('remove_photo', locale)),
                 onTap: () async {
                   await ref.read(userProfileProvider.notifier).setPhoto(null);
                   if (context.mounted) Navigator.of(sheet).pop();

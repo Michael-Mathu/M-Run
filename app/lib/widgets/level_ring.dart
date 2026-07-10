@@ -1,10 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 
 /// Circular level indicator with the level number in the middle and a brand
 /// gradient progress arc.
-class LevelRing extends StatelessWidget {
+class LevelRing extends ConsumerWidget {
   final int level;
   final double progress; // 0..1
   final double size;
@@ -19,7 +21,7 @@ class LevelRing extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final tokens = context.tokens;
@@ -46,7 +48,7 @@ class LevelRing extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('LV',
+              Text(ref.tr('lv'),
                   style: text.labelSmall!.copyWith(
                       color: cs.onSurfaceVariant, letterSpacing: 1)),
               Text(level.toString(),

@@ -275,12 +275,12 @@ class _ActivityNotFound extends StatelessWidget {
                   size: 44, color: cs.onSurface.withValues(alpha: 0.25)),
             ),
             const SizedBox(height: AppTheme.s16),
-            Text('Activity not found', style: text.titleMedium),
+            Text(L10n.tr('activity_not_found', locale), style: text.titleMedium),
             const SizedBox(height: AppTheme.s4),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppTheme.s24),
               child: Text(
-                'This activity may have been deleted or was never synced.',
+                L10n.tr('activity_not_found_body', locale),
                 style: text.bodySmall!
                     .copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
                 textAlign: TextAlign.center,

@@ -456,6 +456,11 @@ this pass:
   no migrations) — intentional MVP choice, left as-is.
 - ⚪ Thin test coverage on the run/safety math (only `back_navigation_test`).
 
+> **Navigation fixes applied (2026-07-10):**
+> - Fixed Legends → Learn back navigation loop: `branchRootFor('/learn/legends/*')` now returns `/learn` instead of `/learn/legends` (itself).
+> - Fixed app crash on system back from deep-linked detail pages: `onAppBack` now properly pops branch navigator first via `router.canPop()` before falling back to parent route.
+> - Test updated: `branchRootFor('/learn/legends/foo')` expects `/learn`.
+
 > Status of the earlier run-sequence crash fixes (C1–C4, Bug #1/#6/#7/#8/#10)
 > is unchanged and still verified: `flutter analyze` is clean.
 

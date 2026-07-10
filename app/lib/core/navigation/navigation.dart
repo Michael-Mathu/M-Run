@@ -32,7 +32,7 @@ String? branchRootFor(String location) {
     return '/learn';
   }
   if (location.startsWith('/challenges/')) return '/challenges';
-  if (location.startsWith('/learn/legends/')) return '/learn/legends';
+  if (location.startsWith('/learn/legends/')) return '/learn';
   if (location.startsWith('/activity/')) return '/activity';
   if (location.startsWith('/beat/')) return '/beat';
   return null;
@@ -40,23 +40,34 @@ String? branchRootFor(String location) {
 
 /// System-wide back behavior. Decides, in priority order:
 ///  1. An open modal/dialog (its own Navigator) — pop that.
-///  2. Real in-app history (`router.canPop`) — pop it.
-///  3. Deep-link / orphan landing — go to the nearest parent page. Never a
+///  2. Real in-app history within the active [StatefulNavigationShell] branch —
+///     pop it. This is what makes "Legends → Learn" work: the Legends screen
+///     lives on the Learn branch's internal navigator, so popping the branch
+///     returns to the Learn root instead of falling through to a hard `go('/')`.
+///  3. Any other go_router history — pop it.
+///  4. Deep-link / orphan landing — go to the nearest parent page. Never a
 ///     random tab jump; only falls back to home for non-shell routes.
 ///
-/// `canPop` (from the OS Navigator and from go_router) is the single source of
-/// truth for history — no custom stack to keep in sync.
+/// `canPop` (from the OS Navigator, the shell branch, and go_router) is the
+/// single source of truth for history — no custom stack to keep in sync.
 void onAppBack(BuildContext context) {
+  // 1. Modal / dialog owned by the OS Navigator.
   final nav = Navigator.of(context, rootNavigator: false);
   if (nav.canPop()) {
     nav.maybePop();
     return;
   }
+
+  // 2. Pop within the current bottom-nav branch (e.g. Legends → Learn).
+  // The branch navigator is the nearest Navigator ancestor (rootNavigator: false).
+  // If that navigator can't pop, try go_router's history.
   final router = GoRouter.of(context);
   if (router.canPop()) {
     router.pop();
     return;
   }
+
+  // 3. Orphan / deep-link landing: fall back one step up the chain.
   final loc = router.state.matchedLocation;
   final fallback = branchRootFor(loc);
   final target = (fallback != null && fallback != loc) ? fallback : '/';

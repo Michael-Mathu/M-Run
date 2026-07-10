@@ -63,7 +63,7 @@ void main() {
     expect(branchRootFor('/challenges/foo'), '/challenges');
     expect(branchRootFor('/learn/course/foo'), '/learn');
     expect(branchRootFor('/learn/course/foo/lesson/0'), '/learn/course/foo');
-    expect(branchRootFor('/learn/legends/foo'), '/learn/legends');
+    expect(branchRootFor('/learn/legends/foo'), '/learn');
     expect(branchRootFor('/activity/123'), '/activity');
     expect(branchRootFor('/beat/123'), '/beat');
     expect(branchRootFor('/'), '/');

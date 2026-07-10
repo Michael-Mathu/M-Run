@@ -27,6 +27,7 @@ class Gamification extends Notifier<GamificationState> {
 
   @override
   GamificationState build() {
+    ref.onDispose(() => _autosaveTimer?.cancel());
     _load();
     _startAutosave();
     return const GamificationState();

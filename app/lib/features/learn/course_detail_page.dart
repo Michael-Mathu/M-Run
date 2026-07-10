@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mwendo_app/core/gamification/gamification_provider.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/features/learn/data/courses.dart';
 
 class CourseDetailPage extends ConsumerWidget {
@@ -20,6 +21,7 @@ class CourseDetailPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: Text(course.title),
         centerTitle: false,
         backgroundColor: Colors.transparent,

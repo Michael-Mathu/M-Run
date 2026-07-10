@@ -421,11 +421,13 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
   /// jump straight to system Settings.
   void _showGpsOverlay(BuildContext context) {
     final locale = ref.read(localeProvider);
+    final cs = Theme.of(context).colorScheme;
+    final surface = Theme.of(context).dialogTheme.backgroundColor ?? cs.surface;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dlg) => Dialog(
-        backgroundColor: AppTheme.darkElevated,
+        backgroundColor: surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.r24)),
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.s24),
@@ -443,11 +445,11 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
               ),
               const SizedBox(height: AppTheme.s16),
               Text(L10n.tr('gps_required_title', locale),
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                  style: TextStyle(color: cs.onSurface, fontSize: 20, fontWeight: FontWeight.w700),
                   textAlign: TextAlign.center),
               const SizedBox(height: AppTheme.s8),
               Text(L10n.tr('gps_required_body', locale),
-                  style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+                  style: TextStyle(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
               const SizedBox(height: AppTheme.s20),
               SizedBox(
                 width: double.infinity,
@@ -815,17 +817,19 @@ class _SosButton extends ConsumerWidget {
 
   void _confirmSos(BuildContext context, WidgetRef ref) {
     final locale = ref.read(localeProvider);
+    final cs = Theme.of(context).colorScheme;
+    final surface = Theme.of(context).dialogTheme.backgroundColor ?? cs.surface;
     final contacts = ref.read(safetyContactsProvider);
     if (contacts.isEmpty) {
       showDialog(
         context: context,
         builder: (dlg) => AlertDialog(
-          backgroundColor: AppTheme.darkElevated,
+          backgroundColor: surface,
           title: Text(L10n.tr('no_emergency_contacts', locale),
-              style: const TextStyle(color: Colors.white)),
+              style: TextStyle(color: cs.onSurface)),
           content: Text(
             L10n.tr('sos_prompt', locale),
-            style: const TextStyle(color: Colors.white70),
+            style: TextStyle(color: cs.onSurfaceVariant),
           ),
           actions: [
             TextButton(
@@ -838,57 +842,19 @@ class _SosButton extends ConsumerWidget {
       return;
     }
 
-    final countdown = ValueNotifier(3);
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dlg) {
-        var dismissed = false;
-        void dismiss() {
-          if (dismissed) return;
-          dismissed = true;
+      builder: (dlg) => PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) Navigator.of(dlg).pop();
+        },
+        child: _SosCountdownDialog(onComplete: () {
           Navigator.of(dlg).pop();
-        }
-        int remaining = 3;
-        final ticker = Timer.periodic(const Duration(seconds: 1), (t) {
-          remaining--;
-          countdown.value = remaining;
-          if (remaining <= 0) {
-            t.cancel();
-            dismiss();
-            _sendSos(ref);
-          }
-        });
-        return PopScope(
-          canPop: false,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) {
-              ticker.cancel();
-              dismiss();
-            }
-          },
-          child: AlertDialog(
-            backgroundColor: AppTheme.darkElevated,
-            title: Text(L10n.tr('sending_sos', locale), style: const TextStyle(color: Colors.white)),
-            content: ValueListenableBuilder<int>(
-              valueListenable: countdown,
-              builder: (_, v, _) => Text(
-                '${L10n.tr('alerting_contacts', locale)}$v…',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  ticker.cancel();
-                  dismiss();
-                },
-                child: Text(L10n.tr('cancel', locale)),
-              ),
-            ],
-          ),
-        );
-      },
+          _sendSos(ref);
+        }),
+      ),
     );
   }
 
@@ -900,5 +866,116 @@ class _SosButton extends ConsumerWidget {
     final lat = last?.lat ?? kDefaultCenter.latitude;
     final lng = last?.lng ?? kDefaultCenter.longitude;
     await SafetyService.sendSos(contacts, lat, lng);
+  }
+}
+
+/// Safety-critical SOS countdown: a circular ring that fills red while the
+/// number ticks 3 → 2 → 1, escalating amber → orange → red for urgency. Each
+/// tick fires a light haptic. Cancelling pops the dialog (timer disposed).
+class _SosCountdownDialog extends ConsumerStatefulWidget {
+  final VoidCallback onComplete;
+  const _SosCountdownDialog({required this.onComplete});
+
+  @override
+  ConsumerState<_SosCountdownDialog> createState() => _SosCountdownDialogState();
+}
+
+class _SosCountdownDialogState extends ConsumerState<_SosCountdownDialog> {
+  static const int _start = 3;
+  int _remaining = _start;
+  late final Timer _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (t) {
+      // Genuine 1-second tick (not a UI animation) — light haptic per second.
+      Haptics.light();
+      setState(() => _remaining--);
+      if (_remaining <= 0) {
+        t.cancel();
+        widget.onComplete();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker.cancel();
+    super.dispose();
+  }
+
+  Color _urgency(BuildContext context) {
+    final tokens = context.tokens;
+    if (_remaining >= 3) return AppTheme.paused; // amber
+    if (_remaining == 2) return AppTheme.brand; // orange
+    return tokens.sos; // red
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = ref.watch(localeProvider);
+    final cs = Theme.of(context).colorScheme;
+    final surface = Theme.of(context).dialogTheme.backgroundColor ?? cs.surface;
+    final urgency = _urgency(context);
+    final progress = (1 - _remaining.clamp(0, _start) / _start).clamp(0.0, 1.0);
+
+    return AlertDialog(
+      backgroundColor: surface,
+      contentPadding: const EdgeInsets.fromLTRB(
+        AppTheme.s24,
+        AppTheme.s24,
+        AppTheme.s24,
+        AppTheme.s16,
+      ),
+      title: Text(L10n.tr('sending_sos', locale),
+          style: TextStyle(color: cs.onSurface)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 10,
+                  color: urgency,
+                  backgroundColor: cs.onSurface.withValues(alpha: 0.12),
+                ),
+              ),
+              Text(
+                '$_remaining',
+                style: Theme.of(context)
+                    .textTheme
+                    .displayMedium!
+                    .copyWith(color: urgency, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.s16),
+          Text(
+            L10n.tr('alerting_contacts', locale),
+            style: TextStyle(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppTheme.s20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: context.tokens.sos,
+                foregroundColor: cs.onError,
+                padding: const EdgeInsets.symmetric(vertical: AppTheme.s16),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(L10n.tr('cancel', locale)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

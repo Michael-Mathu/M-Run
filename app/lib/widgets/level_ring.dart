@@ -21,6 +21,9 @@ class LevelRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tokens = context.tokens;
+    final grad = tokens.brandGradient;
     return SizedBox(
       width: size,
       height: size,
@@ -29,14 +32,14 @@ class LevelRing extends StatelessWidget {
         children: [
           ShaderMask(
             shaderCallback: (rect) => SweepGradient(
-              colors: [AppTheme.brand, AppTheme.brandSoft, AppTheme.brand],
+              colors: [grad.colors.first, tokens.flagGreen, grad.colors.last],
               startAngle: -math.pi / 2,
               endAngle: 3 * math.pi / 2,
             ).createShader(rect),
             child: CircularProgressIndicator(
               value: progress.clamp(0, 1),
               strokeWidth: 5,
-              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              backgroundColor: cs.onSurface.withValues(alpha: 0.12),
               valueColor: const AlwaysStoppedAnimation(Colors.white),
             ),
           ),
@@ -45,10 +48,10 @@ class LevelRing extends StatelessWidget {
             children: [
               Text('LV',
                   style: text.labelSmall!.copyWith(
-                      color: Colors.white70, letterSpacing: 1)),
+                      color: cs.onSurfaceVariant, letterSpacing: 1)),
               Text(level.toString(),
                   style: text.titleLarge!.copyWith(
-                      color: Colors.white, fontWeight: FontWeight.w800)),
+                      color: cs.onSurface, fontWeight: FontWeight.w800)),
             ],
           ),
         ],
@@ -75,6 +78,7 @@ class XpBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -83,14 +87,14 @@ class XpBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: progress.clamp(0, 1),
             minHeight: 8,
-            backgroundColor: Colors.white.withValues(alpha: 0.15),
+            backgroundColor: cs.onSurface.withValues(alpha: 0.12),
             valueColor: AlwaysStoppedAnimation(color),
           ),
         ),
         const SizedBox(height: AppTheme.s6),
         Text(
           '$xpIntoLevel / $xpForNextLevel XP',
-          style: text.labelSmall!.copyWith(color: Colors.white70),
+          style: text.labelSmall!.copyWith(color: cs.onSurfaceVariant),
         ),
       ],
     );

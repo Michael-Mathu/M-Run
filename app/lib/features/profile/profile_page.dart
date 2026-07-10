@@ -23,6 +23,9 @@ import 'package:mwendo_app/features/safety/safety_service.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/haptics.dart';
 import 'package:mwendo_app/widgets/celebration_overlay.dart';
+import 'package:mwendo_app/widgets/metric_tile.dart';
+import 'package:mwendo_app/widgets/trailing_chevron.dart';
+import 'package:mwendo_app/widgets/section_title.dart';
 import 'package:mwendo_app/core/theme/theme_mode_provider.dart';
 import 'package:mwendo_app/core/utils/format.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
@@ -149,7 +152,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       const SizedBox(height: AppTheme.s12),
                       _QuickSettings(mode: mode, units: units, locale: locale, ref: ref),
                       const SizedBox(height: AppTheme.s28),
-                      SectionHeader(L10n.tr('achievements', locale)),
+                      SectionTitle(L10n.tr('achievements', locale)),
                       const SizedBox(height: AppTheme.s12),
                     ]),
                   ),
@@ -183,7 +186,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SectionHeader(L10n.tr('your_legends', locale)),
+                          SectionTitle(L10n.tr('your_legends', locale)),
                           const SizedBox(height: AppTheme.s12),
                           SizedBox(
                             height: 150,
@@ -207,7 +210,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       if (g.titles.isNotEmpty) ...[
-                        SectionHeader(L10n.tr('titles', locale)),
+                         SectionTitle(L10n.tr('titles', locale)),
                         const SizedBox(height: AppTheme.s12),
                         Wrap(
                           spacing: AppTheme.s8,
@@ -223,15 +226,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         ),
                         const SizedBox(height: AppTheme.s28),
                       ],
-                      SectionHeader('${L10n.tr('leaderboard', locale)} · Rank #$rank'),
+                      SectionTitle('${L10n.tr('leaderboard', locale)} · Rank #$rank'),
                       const SizedBox(height: AppTheme.s12),
                       ...board.map((e) => _LeaderRow(e: e, text: text, cs: cs)),
                       const SizedBox(height: AppTheme.s28),
-                      SectionHeader(L10n.tr('account', locale)),
+                      SectionTitle(L10n.tr('account', locale)),
                       const SizedBox(height: AppTheme.s12),
                       _AccountTile(),
                       const SizedBox(height: AppTheme.s28),
-                      SectionHeader(L10n.tr('settings', locale)),
+                      SectionTitle(L10n.tr('settings', locale)),
                       const SizedBox(height: AppTheme.s12),
                       _LangTile(cs: cs, text: text, ref: ref, locale: locale),
                       _SettingTile(
@@ -280,39 +283,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             onDone: () => setState(() => _showLevelUp = false),
           ),
       ],
-    );
-  }
-}
-
-class SectionHeader extends StatelessWidget {
-  final String title;
-  const SectionHeader(this.title, {super.key});
-
-  @override
-  Widget build(BuildContext context) => Text(title, style: Theme.of(context).textTheme.titleLarge);
-}
-
-class _StatTile extends StatelessWidget {
-  final String label;
-  final String value;
-  const _StatTile({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final cs = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(AppTheme.s16),
-        decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(AppTheme.r12)),
-        child: Column(
-          children: [
-            Text(value, style: text.titleLarge!.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
-            const SizedBox(height: AppTheme.s4),
-            Text(label.toUpperCase(), style: text.labelSmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -371,9 +341,9 @@ class _TrophyTileState extends State<_TrophyTile>
             Stack(
               alignment: Alignment.center,
               children: [
-                Text(meta.emoji, style: TextStyle(fontSize: 28, color: widget.earned ? null : Colors.white24)),
+                Text(meta.emoji, style: TextStyle(fontSize: 28, color: widget.earned ? null : cs.onSurface.withValues(alpha: 0.25))),
                 if (!widget.earned)
-                  const Icon(Icons.lock_rounded, size: 14, color: Colors.white38),
+                  Icon(Icons.lock_rounded, size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.45)),
               ],
             ),
             const SizedBox(height: AppTheme.s6),
@@ -446,7 +416,15 @@ class _StatRow extends StatelessWidget {
       ];
     }
     return Row(
-      children: tiles.map((t) => _StatTile(label: t.label, value: t.value)).toList(),
+      children: tiles
+          .map((t) => Expanded(
+                child: MetricTile(
+                  variant: MetricVariant.card,
+                  label: t.label,
+                  value: t.value,
+                ),
+              ))
+          .toList(),
     );
   }
 }
@@ -668,7 +646,7 @@ class _SettingTile extends StatelessWidget {
       ),
       title: Text(title, style: text.titleMedium),
       subtitle: subtitle != null ? Text(subtitle!, style: text.bodySmall) : null,
-      trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+      trailing: const TrailingChevron(),
     );
     if (onTap == null) return child;
     return InkWell(

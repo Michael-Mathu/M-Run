@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mwendo_app/core/gamification/gamification_provider.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/haptics.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
 import 'package:mwendo_app/widgets/level_ring.dart';
 
@@ -145,17 +145,20 @@ class _FilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: AppTheme.s16, vertical: AppTheme.s8),
         decoration: BoxDecoration(
-          color: active ? AppTheme.brand : Theme.of(context).colorScheme.surface,
+          color: active ? AppTheme.brand.withValues(alpha: 0.18) : cs.surface,
           borderRadius: BorderRadius.circular(AppTheme.rFull),
+          border: active ? Border.all(color: AppTheme.brand) : null,
         ),
         child: Text(label,
             style: text.labelMedium!.copyWith(
-                color: active ? Colors.white : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))),
+                color: active ? AppTheme.brand : cs.onSurface.withValues(alpha: 0.7),
+                fontWeight: active ? FontWeight.w700 : FontWeight.w600)),
       ),
     );
   }
@@ -175,6 +178,7 @@ class _ChallengeCard extends StatelessWidget {
     final ratio = ch.ratio(g);
     final done = ch.isComplete(g);
     final color = tierColor(ch.tier);
+    final progressColor = done ? context.tokens.flagGreen : color;
 
     return Container(
       decoration: BoxDecoration(
@@ -185,14 +189,14 @@ class _ChallengeCard extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(AppTheme.r16),
         boxShadow: done
-            ? <BoxShadow>[BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 16, spreadRadius: 1)]
+            ? <BoxShadow>[BoxShadow(color: progressColor.withValues(alpha: 0.45), blurRadius: 16, spreadRadius: 1)]
             : null,
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppTheme.r16),
         onTap: () {
           Haptics.light();
-          context.push('/challenges/${ch.slug}');
+          context.pushSafe('/challenges/${ch.slug}');
         },
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.s16),
@@ -227,13 +231,13 @@ class _ChallengeCard extends StatelessWidget {
                         value: ratio,
                         minHeight: 6,
                         backgroundColor: cs.surfaceContainerHighest,
-                        valueColor: AlwaysStoppedAnimation(color),
+                        valueColor: AlwaysStoppedAnimation(progressColor),
                       ),
                     ),
                     const SizedBox(height: AppTheme.s6),
                     Text(
                       done ? L10n.tr('completed', locale) : ch.progressText(g),
-                      style: text.labelSmall!.copyWith(color: done ? color : cs.onSurface.withValues(alpha: 0.55)),
+                      style: text.labelSmall!.copyWith(color: done ? progressColor : cs.onSurface.withValues(alpha: 0.55)),
                     ),
                   ],
                 ),

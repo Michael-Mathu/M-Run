@@ -7,11 +7,18 @@ class AppTheme {
   // ---- Brand palette (curated, not algorithmic) ----
   static const Color brand = Color(0xFFFF5A1F); // kinetic orange
   static const Color brandSoft = Color(0xFFFF8A5C);
-  static const Color recording = Color(0xFFFE2E4B); // live red pulse
+  // Flag-refined reds: deeper, more "Kenyan" than the old neon alert reds.
+  static const Color recording = Color(0xFFC5283D); // live red pulse
+  static const Color sos = Color(0xFFC5283D); // SOS / danger
   static const Color paused = Color(0xFFF5A623);
   static const Color idle = Color(0xFF8A8A8E);
-  static const Color sos = Color(0xFFFF1744);
   static const Color achievement = Color(0xFFFFD15C); // gold
+
+  // Kenyan-flag semantic accents ("K-Earth"): green = prosperity/terrain/
+  // success/data-viz. Not literal flag stripes — mapped to UI roles only.
+  static const Color flagGreen = Color(0xFF1B8A5A); // dark-theme green
+  static const Color flagGreenLight = Color(0xFF0E5C36); // light-theme green (deeper for contrast)
+  static const Color flagRed = Color(0xFFC5283D); // flag's deeper red
 
   // Dark surfaces
   static const Color darkScaffold = Color(0xFF0B0B0C);
@@ -194,6 +201,12 @@ class AppExtensions extends ThemeExtension<AppExtensions> {
   final Color achievement;
   final List<Color> hrZones;
   final LinearGradient brandGradient;
+  /// Kenyan-flag green (theme-aware): terrain/success/data-viz accent.
+  final Color flagGreen;
+  /// Large numeric metric value style (one ramp across all screens).
+  final TextStyle metricValue;
+  /// Secondary metric label style (uppercase baked in; no call-site toUpper).
+  final TextStyle metricLabel;
 
   const AppExtensions({
     required this.recording,
@@ -203,7 +216,23 @@ class AppExtensions extends ThemeExtension<AppExtensions> {
     required this.achievement,
     required this.hrZones,
     required this.brandGradient,
+    required this.flagGreen,
+    required this.metricValue,
+    required this.metricLabel,
   });
+
+  static const _metricValue = TextStyle(
+    fontSize: 30,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.5,
+    height: 1.0,
+  );
+  static const _metricLabel = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 1.2,
+    color: AppTheme.idle,
+  );
 
   static const light = AppExtensions(
     recording: AppTheme.recording,
@@ -213,6 +242,9 @@ class AppExtensions extends ThemeExtension<AppExtensions> {
     achievement: AppTheme.achievement,
     hrZones: AppTheme.hrZones,
     brandGradient: LinearGradient(colors: [AppTheme.brand, Color(0xFFFF8A3D)]),
+    flagGreen: AppTheme.flagGreenLight,
+    metricValue: _metricValue,
+    metricLabel: _metricLabel,
   );
 
   static const dark = AppExtensions(
@@ -223,6 +255,9 @@ class AppExtensions extends ThemeExtension<AppExtensions> {
     achievement: AppTheme.achievement,
     hrZones: AppTheme.hrZones,
     brandGradient: LinearGradient(colors: [AppTheme.brand, Color(0xFFFF8A3D)]),
+    flagGreen: AppTheme.flagGreen,
+    metricValue: _metricValue,
+    metricLabel: _metricLabel,
   );
 
   @override
@@ -234,6 +269,9 @@ class AppExtensions extends ThemeExtension<AppExtensions> {
     Color? achievement,
     List<Color>? hrZones,
     LinearGradient? brandGradient,
+    Color? flagGreen,
+    TextStyle? metricValue,
+    TextStyle? metricLabel,
   }) =>
       AppExtensions(
         recording: recording ?? this.recording,
@@ -243,6 +281,9 @@ class AppExtensions extends ThemeExtension<AppExtensions> {
         achievement: achievement ?? this.achievement,
         hrZones: hrZones ?? this.hrZones,
         brandGradient: brandGradient ?? this.brandGradient,
+        flagGreen: flagGreen ?? this.flagGreen,
+        metricValue: metricValue ?? this.metricValue,
+        metricLabel: metricLabel ?? this.metricLabel,
       );
 
   @override
@@ -256,10 +297,30 @@ class AppExtensions extends ThemeExtension<AppExtensions> {
       achievement: Color.lerp(achievement, other.achievement, t)!,
       hrZones: hrZones,
       brandGradient: brandGradient,
+      flagGreen: Color.lerp(flagGreen, other.flagGreen, t)!,
+      metricValue: TextStyle.lerp(metricValue, other.metricValue, t)!,
+      metricLabel: TextStyle.lerp(metricLabel, other.metricLabel, t)!,
     );
   }
 }
 
 extension AppContext on BuildContext {
   AppExtensions get tokens => Theme.of(this).extension<AppExtensions>()!;
+  /// Shorthand alias for [tokens] (theme-aware colors in widgets).
+  AppExtensions get cs => tokens;
 }
+
+/// Motion vocabulary — use these tokens instead of hardcoded durations.
+///   dFast (150ms) — micro-interactions, ticks
+///   dMed  (300ms) — state changes, content fades
+///   dSlow (520ms) — entrance/staggered reveals
+///   curveSnappy — UI state changes (easeOutCubic)
+///   curveSpring — playful/overshoot (trophy pop, first-run hint)
+///
+/// Haptic intent map:
+///   selection — passive UI nav (tab switch)
+///   light     — affirmative confirmation
+///   medium    — state-changing action (start run)
+///   heavy     — destructive/significant (stop run)
+///   celebrate — level-up / achievement
+// ponytail: motion/haptic doc kept as comments to avoid an unused-symbol lint.

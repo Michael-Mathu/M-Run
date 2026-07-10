@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:mwendo_app/core/theme/app_theme.dart';
 
 /// Free, key-less, globally-available Carto dark basemap. Works everywhere
 /// (including Kenya) with no API key. This is the single style the app ships
@@ -282,8 +283,8 @@ class _MwendoMapState extends State<MwendoMap> {
             ),
           ),
         Positioned(
-          right: 16,
-          bottom: (_isLive && !_autoFollow) ? 72 : 16,
+          right: AppTheme.s16,
+          bottom: (_isLive && !_autoFollow) ? 72 : AppTheme.s16,
           child: _ZoomControls(
             onIn: () => _ctrl?.animateCamera(CameraUpdate.zoomIn()),
             onOut: () => _ctrl?.animateCamera(CameraUpdate.zoomOut()),
@@ -291,8 +292,8 @@ class _MwendoMapState extends State<MwendoMap> {
         ),
         if (_isLive && !_autoFollow)
           Positioned(
-            right: 16,
-            bottom: 16,
+            right: AppTheme.s16,
+            bottom: AppTheme.s16,
             child: _RecenterButton(onTap: _recenter),
           ),
       ],
@@ -341,7 +342,7 @@ class _ZoomControls extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _ZoomButton(icon: Icons.add_rounded, onTap: onIn),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppTheme.s8),
         _ZoomButton(icon: Icons.remove_rounded, onTap: onOut),
       ],
     );
@@ -392,7 +393,7 @@ class _EmptyRoutePlaceholder extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.explore_outlined, size: 40, color: Colors.white24),
-            SizedBox(height: 8),
+            SizedBox(height: AppTheme.s8),
             Text('No route recorded', style: TextStyle(color: Colors.white38)),
           ],
         ),

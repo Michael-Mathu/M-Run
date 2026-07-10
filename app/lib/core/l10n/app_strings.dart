@@ -1,14 +1,32 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum AppLocale { english, swahili }
 
+const _localePrefKey = 'mwendo.locale';
+
 class LocaleNotifier extends Notifier<AppLocale> {
   @override
-  AppLocale build() => AppLocale.english;
+  AppLocale build() {
+    // Restore persisted locale (plan §7). First frame may briefly show the
+    // default; the async load corrects it before the user perceives a change.
+    _restore();
+    return AppLocale.english;
+  }
 
-  void set(AppLocale l) => state = l;
-  void toggle() =>
-      state = state == AppLocale.english ? AppLocale.swahili : AppLocale.english;
+  Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString(_localePrefKey);
+    if (code == 'sw') state = AppLocale.swahili;
+  }
+
+  void set(AppLocale l) {
+    state = l;
+    SharedPreferences.getInstance()
+        .then((p) => p.setString(_localePrefKey, l == AppLocale.swahili ? 'sw' : 'en'));
+  }
+
+  void toggle() => set(state == AppLocale.english ? AppLocale.swahili : AppLocale.english);
 }
 
 final localeProvider = NotifierProvider<LocaleNotifier, AppLocale>(LocaleNotifier.new);
@@ -203,6 +221,25 @@ class L10n {
     'ok': {'en': 'OK', 'sw': 'Sawa'},
     'ghost_held_off': {'en': '{name} held you off — you: {userPace} /km, ghost: {ghostPace} /km', 'sw': '{name} amekuzuia — wewe: {userPace} /km, mzuka: {ghostPace} /km'},
     'you_beat_ghost': {'en': 'You beat {name}! 🏆 ({userPace} vs {ghostPace} /km)', 'sw': 'Umemshinda {name}! 🏆 ({userPace} dhidi ya {ghostPace} /km)'},
+
+    // ---- Onboarding (Phase 2 audit) ----
+    'onboarding_skip': {'en': 'Skip', 'sw': 'Ruka'},
+    'onboarding_next': {'en': 'Next', 'sw': 'Mbele'},
+    'onboarding_get_started': {'en': 'Get started', 'sw': 'Anza'},
+    'onboarding_run_title': {'en': 'Run with Mwendo', 'sw': 'Kimbia na Mwendo'},
+    'onboarding_run_body': {'en': 'Track every step with a live map, pace and heart rate — all in one screen.', 'sw': 'Fuatilia hatua zako kwa ramani ya moja kwa moja, kasi na mapigo ya moyo — yote kwenye skrini moja.'},
+    'onboarding_challenges_title': {'en': 'Challenges that stick', 'sw': 'Changamoto zinazoshikia'},
+    'onboarding_challenges_body': {'en': 'Hit your first 5K, build a streak, and watch your XP grow with every run.', 'sw': 'Fikia 5K yako ya kwanza, jenge msururu, na uone XP yako ikiongezeka kila mbio.'},
+    'onboarding_safe_title': {'en': 'Run safe', 'sw': 'Kimbia salama'},
+    'onboarding_safe_body': {'en': 'One tap to alert your emergency contacts with your live location. Always.', 'sw': 'Gusa mara moja kuwaonya anwani zako za dharura kwa eneo lako la moja kwa moja. Siku zote.'},
+
+    // ---- Learn (Phase 2 audit) ----
+    'learn_hero_body': {'en': 'Learn the science, the technique, and the heritage of East African running.', 'sw': 'Jifunze sayansi, mbinu, na urithi wa kukimbia kwa Afrika Mashariki.'},
+    'start': {'en': 'Start', 'sw': 'Anza'},
+    'legendary_runners': {'en': 'legendary runners', 'sw': 'wakimbiaji wa hadithi'},
+    'legends_teaser_sub': {'en': 'Keino to Kipyegon — their stories, records and quotes.', 'sw': 'Keino hadi Kipyegon — hadithi, rekodi na quote zao.'},
+    'race_ghost_legend': {'en': 'Race a ghost legend', 'sw': 'Shindana na mzuka wa hadithi'},
+    'race_ghost_sub': {'en': 'Pit your pace against Kipchoge, Kipyegon and more.', 'sw': 'Pima kasi yako dhidi ya Kipchoge, Kipyegon na wengine.'},
   };
 
   static String tr(String key, AppLocale locale) {

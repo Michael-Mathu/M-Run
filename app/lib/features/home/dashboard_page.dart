@@ -9,10 +9,13 @@ import 'package:mwendo_app/core/utils/haptics.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
 import 'package:mwendo_app/features/learn/data/courses.dart';
 import 'package:mwendo_app/features/learn/data/legend_of_day.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/data/models/run_record.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
+import 'package:mwendo_app/widgets/metric_tile.dart';
 import 'package:mwendo_app/widgets/section_title.dart';
 import 'package:mwendo_app/widgets/skeleton.dart';
+import 'package:mwendo_app/widgets/trailing_chevron.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -65,7 +68,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 delegate: SliverChildListDelegate([
                   _TopBar(g: g, locale: locale),
                   const SizedBox(height: AppTheme.s24),
-                  _WeeklyCard(g: g, text: text, locale: locale),
+                  _WeeklyCard(g: g, recent: recent, text: text, locale: locale),
                   const SizedBox(height: AppTheme.s16),
                   _StartRunButton(),
                   if (g.totalRuns == 0) ...[
@@ -98,7 +101,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   if (active.isEmpty) {
                     return _AllDoneCard(cs: cs, text: text, onTap: () => context.go('/challenges'));
                   }
-                  return _DashboardChallengeCard(ch: active[i], g: g, onTap: () => context.push('/challenges/${active[i].slug}'));
+                  return _DashboardChallengeCard(ch: active[i], g: g, onTap: () => context.pushSafe('/challenges/${active[i].slug}'));
                 },
               ),
             ),
@@ -116,24 +119,37 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       actionLabel: L10n.tr('see_all', locale),
                       onAction: () => context.go('/activity')),
                   const SizedBox(height: AppTheme.s4),
-                  recent.when(
-                    loading: () => const Column(
-                      children: [SkeletonCard(height: 88), SizedBox(height: AppTheme.s12), SkeletonCard(height: 88)],
+                  AnimatedSwitcher(
+                    duration: AppTheme.dFast,
+                    transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                    child: recent.when(
+                      loading: () => const KeyedSubtree(
+                        key: ValueKey('recent-loading'),
+                        child: Column(
+                          children: [SkeletonCard(height: 88), SizedBox(height: AppTheme.s12), SkeletonCard(height: 88)],
+                        ),
+                      ),
+                      error: (_, _) => KeyedSubtree(
+                        key: const ValueKey('recent-error'),
+                        child: _EmptyActivity(
+                            text: text, cs: cs, locale: locale, onWalkRun: () => context.go('/run'), onCourse: () => context.go('/learn/course/how-to-start-running')),
+                      ),
+                      data: (runs) => KeyedSubtree(
+                        key: ValueKey('recent-data-${runs.length}'),
+                        child: runs.isEmpty
+                            ? _EmptyActivity(
+                                text: text, cs: cs, locale: locale, onWalkRun: () => context.go('/run'), onCourse: () => context.go('/learn/course/how-to-start-running'))
+                            : Column(
+                                children: [
+                                  for (final r in runs.take(3))
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: AppTheme.s12),
+                                      child: _RecentRunTile(r: r),
+                                    ),
+                                ],
+                              ),
+                      ),
                     ),
-                    error: (_, _) => _EmptyActivity(
-                        text: text, cs: cs, locale: locale, onWalkRun: () => context.go('/run'), onCourse: () => context.go('/learn/course/how-to-start-running')),
-                    data: (runs) => runs.isEmpty
-                        ? _EmptyActivity(
-                            text: text, cs: cs, locale: locale, onWalkRun: () => context.go('/run'), onCourse: () => context.go('/learn/course/how-to-start-running'))
-                        : Column(
-                            children: [
-                              for (final r in runs.take(3))
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: AppTheme.s12),
-                                  child: _RecentRunTile(r: r),
-                                ),
-                            ],
-                          ),
                   ),
                   const SizedBox(height: AppTheme.s24),
                 ]),
@@ -212,12 +228,22 @@ class _TopBar extends StatelessWidget {
 
 class _WeeklyCard extends StatelessWidget {
   final GamificationState g;
+  final AsyncValue<List<RunRecord>> recent;
   final TextTheme text;
   final AppLocale locale;
-  const _WeeklyCard({required this.g, required this.text, required this.locale});
+  const _WeeklyCard({required this.g, required this.recent, required this.text, required this.locale});
 
   @override
   Widget build(BuildContext context) {
+    // Real "this week" aggregate: runs whose start is on/after the Monday of
+    // the current week. Same 7-day window approach used in profile_page.dart.
+    final now = DateTime.now();
+    final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final runs = recent.value ?? const <RunRecord>[];
+    final weekly = runs.where((r) => !r.startedAt.isBefore(weekStart)).toList();
+    final wDist = weekly.fold(0.0, (s, r) => s + r.distanceM);
+    final wTime = weekly.fold(0, (s, r) => s + r.durationMs);
+
     return Container(
       padding: const EdgeInsets.all(AppTheme.s24),
       decoration: BoxDecoration(
@@ -232,37 +258,34 @@ class _WeeklyCard extends StatelessWidget {
         children: [
           Text(L10n.tr('this_week', locale), style: text.labelMedium!.copyWith(color: Colors.white70)),
           const SizedBox(height: AppTheme.s4),
-          Text(formatDistance(g.totalDistanceM),
+          Text(formatDistance(wDist),
               style: text.displayMedium!.copyWith(color: Colors.white, fontFeatures: const [FontFeature.tabularFigures()])),
           const SizedBox(height: AppTheme.s20),
           Row(
             children: [
-              _Stat(label: L10n.tr('runs', locale), value: g.totalRuns.toString()),
-              _Stat(label: L10n.tr('time', locale), value: formatDuration(g.totalTimeMs)),
-              _Stat(label: L10n.tr('best', locale), value: g.bestPaceMinPerKm > 0 ? formatPace(g.bestPaceMinPerKm) : '--'),
+              Expanded(
+                child: MetricTile(
+                  variant: MetricVariant.hero,
+                  label: L10n.tr('runs', locale),
+                  value: weekly.length.toString(),
+                ),
+              ),
+              Expanded(
+                child: MetricTile(
+                  variant: MetricVariant.hero,
+                  label: L10n.tr('time', locale),
+                  value: formatDuration(wTime),
+                ),
+              ),
+              Expanded(
+                child: MetricTile(
+                  variant: MetricVariant.hero,
+                  label: L10n.tr('best', locale),
+                  value: g.bestPaceMinPerKm > 0 ? formatPace(g.bestPaceMinPerKm) : '--',
+                ),
+              ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  final String label;
-  final String value;
-  const _Stat({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(value, style: text.titleLarge!.copyWith(color: Colors.white, fontFeatures: const [FontFeature.tabularFigures()])),
-          const SizedBox(height: AppTheme.s2),
-          Text(label.toUpperCase(), style: text.labelSmall!.copyWith(color: Colors.white70)),
         ],
       ),
     );
@@ -462,7 +485,7 @@ class _AllDoneCard extends ConsumerWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+              const TrailingChevron(),
             ],
           ),
         ),
@@ -560,7 +583,7 @@ class _RecentRunTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+              const TrailingChevron(),
             ],
           ),
         ),
@@ -641,7 +664,7 @@ class _EmptyActivity extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                  const TrailingChevron(),
                 ],
               ),
             ),

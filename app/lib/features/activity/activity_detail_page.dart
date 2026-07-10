@@ -6,8 +6,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
 import 'package:mwendo_app/data/sample_activities.dart';
+import 'package:mwendo_app/widgets/metric_tile.dart';
 import 'package:mwendo_app/widgets/route_map.dart';
 import 'package:mwendo_app/widgets/skeleton.dart';
 
@@ -22,14 +24,26 @@ class ActivityDetailPage extends ConsumerWidget {
       return const Scaffold(body: SafeArea(child: _DetailSkeleton()));
     }
     final run = asyncRun.value;
-    final a = run?.toSampleActivity() ?? SampleActivity.forId(id);
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final locale = ref.watch(localeProvider);
+    if (run == null) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: Text(L10n.tr('activity', locale)),
+        ),
+        body: SafeArea(
+          child: _ActivityNotFound(text: text, cs: cs, locale: locale),
+        ),
+      );
+    }
+    final a = run.toSampleActivity();
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
+        leading: const AppBackButton(color: Colors.white),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -69,7 +83,7 @@ class ActivityDetailPage extends ConsumerWidget {
                   title: L10n.tr('elevation', locale),
                   unit: 'm',
                   values: a.elevation,
-                  color: AppTheme.brand,
+                  color: context.tokens.flagGreen,
                 ),
                 const SizedBox(height: AppTheme.s16),
                 _ChartCard(
@@ -95,13 +109,13 @@ class _StatsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final items = [
-      _Stat(formatDistance(a.distanceM), L10n.tr('distance', locale)),
-      _Stat(formatPace(a.avgPaceMinPerKm), L10n.tr('avg_pace', locale)),
-      _Stat(formatDuration(a.durationMs), L10n.tr('time', locale)),
-      _Stat(a.calories.toString(), L10n.tr('calories', locale)),
-      _Stat(a.elevationGainM.toStringAsFixed(0), L10n.tr('elev_gain', locale)),
-      _Stat(a.avgCadence > 0 ? a.avgCadence.toString() : '--', 'CAD'),
+    final items = <(String, String)>[
+      (formatDistance(a.distanceM), L10n.tr('distance', locale)),
+      (formatPace(a.avgPaceMinPerKm), L10n.tr('avg_pace', locale)),
+      (formatDuration(a.durationMs), L10n.tr('time', locale)),
+      (a.calories.toString(), L10n.tr('calories', locale)),
+      (a.elevationGainM.toStringAsFixed(0), L10n.tr('elev_gain', locale)),
+      (a.avgCadence > 0 ? a.avgCadence.toString() : '--', 'CAD'),
     ];
     return GridView.count(
       crossAxisCount: 3,
@@ -117,36 +131,17 @@ class _StatsGrid extends StatelessWidget {
                   color: cs.surface,
                   borderRadius: BorderRadius.circular(AppTheme.r12),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(s.value,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium!
-                            .copyWith(
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures()
-                                ])),
-                    const SizedBox(height: AppTheme.s4),
-                    Text(s.label.toUpperCase(),
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall!
-                            .copyWith(
-                                color: cs.onSurface.withValues(alpha: 0.55))),
-                  ],
+                child: Center(
+                  child: MetricTile(
+                    value: s.$1,
+                    label: s.$2,
+                    variant: MetricVariant.card,
+                  ),
                 ),
               ))
           .toList(),
     );
   }
-}
-
-class _Stat {
-  final String value;
-  final String label;
-  const _Stat(this.value, this.label);
 }
 
 class _ChartCard extends StatelessWidget {
@@ -251,5 +246,47 @@ class _DetailSkeleton extends StatelessWidget {
             ),
           ),
         ],
+      );
+}
+
+class _ActivityNotFound extends StatelessWidget {
+  final TextTheme text;
+  final ColorScheme cs;
+  final AppLocale locale;
+  const _ActivityNotFound({
+    required this.text,
+    required this.cs,
+    required this.locale,
+  });
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: cs.surface,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.search_off_rounded,
+                  size: 44, color: cs.onSurface.withValues(alpha: 0.25)),
+            ),
+            const SizedBox(height: AppTheme.s16),
+            Text('Activity not found', style: text.titleMedium),
+            const SizedBox(height: AppTheme.s4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppTheme.s24),
+              child: Text(
+                'This activity may have been deleted or was never synced.',
+                style: text.bodySmall!
+                    .copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
       );
 }

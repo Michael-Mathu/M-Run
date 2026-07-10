@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/data/models/run_record.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
 import 'package:mwendo_app/features/learn/data/courses.dart';
@@ -55,6 +56,8 @@ class LegendDetailPage extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
+                      const AppBackButton(color: Colors.white),
+                      const SizedBox(width: AppTheme.s8),
                       CircleAvatar(
                         radius: 36,
                         backgroundColor: Colors.white.withValues(alpha: 0.2),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/features/onboarding/onboarding_provider.dart';
 
@@ -15,26 +16,28 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   final _page = PageController();
   int _index = 0;
 
-  static const _pages = [
-    _Slide(
-      icon: Icons.directions_run_rounded,
-      title: 'Run with Mwendo',
-      body: 'Track every step with a live map, pace and heart rate — all in one screen.',
-    ),
-    _Slide(
-      icon: Icons.emoji_events_rounded,
-      title: 'Challenges that stick',
-      body: 'Hit your first 5K, build a streak, and watch your XP grow with every run.',
-    ),
-    _Slide(
-      icon: Icons.shield_outlined,
-      title: 'Run safe',
-      body: 'One tap to alert your emergency contacts with your live location. Always.',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final locale = ref.watch(localeProvider);
+    final slides = [
+      _Slide(
+        icon: Icons.directions_run_rounded,
+        title: L10n.tr('onboarding_run_title', locale),
+        body: L10n.tr('onboarding_run_body', locale),
+      ),
+      _Slide(
+        icon: Icons.emoji_events_rounded,
+        title: L10n.tr('onboarding_challenges_title', locale),
+        body: L10n.tr('onboarding_challenges_body', locale),
+      ),
+      _Slide(
+        icon: Icons.shield_outlined,
+        title: L10n.tr('onboarding_safe_title', locale),
+        body: L10n.tr('onboarding_safe_body', locale),
+      ),
+    ];
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -43,28 +46,28 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               alignment: Alignment.topRight,
               child: TextButton(
                 onPressed: _finish,
-                child: const Text('Skip'),
+                child: Text(L10n.tr('onboarding_skip', locale)),
               ),
             ),
             Expanded(
               child: PageView.builder(
                 controller: _page,
-                itemCount: _pages.length,
+                itemCount: slides.length,
                 onPageChanged: (i) => setState(() => _index = i),
-                itemBuilder: (_, i) => _pages[i],
+                itemBuilder: (_, i) => slides[i],
               ),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                _pages.length,
+                slides.length,
                 (i) => AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   width: i == _index ? 24 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: i == _index ? AppTheme.brand : Colors.white24,
+                    color: i == _index ? AppTheme.brand : cs.onSurfaceVariant,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -75,7 +78,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               padding: const EdgeInsets.symmetric(horizontal: AppTheme.s24),
               child: FilledButton(
                 onPressed: () {
-                  if (_index < _pages.length - 1) {
+                  if (_index < slides.length - 1) {
                     _page.nextPage(
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeOut,
@@ -89,7 +92,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(56),
                 ),
-                child: Text(_index < _pages.length - 1 ? 'Next' : 'Get started'),
+                child: Text(_index < slides.length - 1
+                    ? L10n.tr('onboarding_next', locale)
+                    : L10n.tr('onboarding_get_started', locale)),
               ),
             ),
             const SizedBox(height: AppTheme.s32),
@@ -115,6 +120,7 @@ class _Slide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppTheme.s32),
       child: Column(
@@ -134,7 +140,7 @@ class _Slide extends StatelessWidget {
           const SizedBox(height: AppTheme.s12),
           Text(body,
               style: text.bodyLarge!
-                  .copyWith(color: Colors.white.withValues(alpha: 0.72)),
+                  .copyWith(color: cs.onSurface.withValues(alpha: 0.72)),
               textAlign: TextAlign.center),
         ],
       ),

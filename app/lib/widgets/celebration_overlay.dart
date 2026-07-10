@@ -52,10 +52,10 @@ class _CelebrationOverlayState extends State<CelebrationOverlay> {
             numberOfParticles: 40,
             gravity: 0.4,
             colors: const [
-              Color(0xFFFF5A1F),
-              Color(0xFFFFD15C),
-              Color(0xFF2BB673),
-              Color(0xFF4A90E2),
+              AppTheme.brand,
+              AppTheme.achievement,
+              AppTheme.flagGreen,
+              AppTheme.flagRed,
               Colors.white,
             ],
           ),
@@ -63,7 +63,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.emoji_events_rounded,
-                  size: 72, color: Color(0xFFFFD15C)),
+                  size: 72, color: AppTheme.achievement),
               const SizedBox(height: AppTheme.s16),
               Text(widget.title,
                   style: text.headlineLarge!

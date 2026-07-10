@@ -7,6 +7,7 @@ import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
 import 'package:mwendo_app/features/beat/ghost_target_provider.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/features/learn/data/beat_legends.dart';
 import 'package:mwendo_app/features/learn/data/legends.dart';
 
@@ -37,7 +38,11 @@ class _BeatLegendsPageState extends ConsumerState<BeatLegendsPage> {
     final locale = ref.watch(localeProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(L10n.tr('beat_the_legends', locale)), centerTitle: false),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: Text(L10n.tr('beat_the_legends', locale)),
+        centerTitle: false,
+      ),
       body: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -235,7 +240,9 @@ class _SplitsChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final accent = legendAccent(g.legend);
+    final axisText = TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 10);
     final (min, max) = g.splits.fold<(double, double)>(
       (double.infinity, double.negativeInfinity),
       ((double, double) acc, double v) => (math.min(acc.$1, v), math.max(acc.$2, v)),
@@ -257,7 +264,7 @@ class _SplitsChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               getTitlesWidget: (v, _) => Text('${v.toInt() + 1}',
-                  style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                  style: axisText),
               interval: (g.splits.length / 6).ceilToDouble().clamp(1, 999),
             ),
           ),
@@ -265,13 +272,13 @@ class _SplitsChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               getTitlesWidget: (v, _) => Text('${v.toInt()}s',
-                  style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                  style: axisText),
             ),
           ),
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
-        gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => const FlLine(color: Colors.white10)),
+        gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => FlLine(color: cs.onSurfaceVariant.withValues(alpha: 0.12))),
         borderData: FlBorderData(show: false),
         minY: min * 0.95,
         maxY: max * 1.05,

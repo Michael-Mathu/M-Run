@@ -7,6 +7,7 @@ import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/features/learn/data/courses.dart';
 import 'package:mwendo_app/features/learn/data/legends.dart';
 import 'package:mwendo_app/widgets/section_title.dart';
+import 'package:mwendo_app/widgets/trailing_chevron.dart';
 
 class LearnPage extends ConsumerWidget {
   const LearnPage({super.key});
@@ -33,7 +34,7 @@ class LearnPage extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(AppTheme.s24, AppTheme.s16, AppTheme.s24, 0),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  _Hero(text: text),
+                  _Hero(text: text, locale: locale),
                   const SizedBox(height: AppTheme.s24),
                 ]),
               ),
@@ -56,6 +57,7 @@ class LearnPage extends ConsumerWidget {
                           .map((c) => _CourseCard(
                                 course: c,
                                 done: g.lessonsCompletedIn(c.slug),
+                                locale: locale,
                               ))
                           .toList(),
                     ),
@@ -69,11 +71,11 @@ class LearnPage extends ConsumerWidget {
                 delegate: SliverChildListDelegate([
                   SectionTitle(L10n.tr('legends', locale)),
                   const SizedBox(height: AppTheme.s4),
-                  _LegendsTeaser(),
+                  _LegendsTeaser(locale: locale),
                   const SizedBox(height: AppTheme.s16),
                   SectionTitle(L10n.tr('beat_the_legends', locale)),
                   const SizedBox(height: AppTheme.s4),
-                  _BeatTeaser(),
+                  _BeatTeaser(locale: locale),
                   const SizedBox(height: AppTheme.s32),
                 ]),
               ),
@@ -87,7 +89,8 @@ class LearnPage extends ConsumerWidget {
 
 class _Hero extends StatelessWidget {
   final TextTheme text;
-  const _Hero({required this.text});
+  final AppLocale locale;
+  const _Hero({required this.text, required this.locale});
 
   @override
   Widget build(BuildContext context) {
@@ -111,13 +114,13 @@ class _Hero extends StatelessWidget {
             children: [
               const Icon(Icons.school_rounded, color: Colors.white, size: 26),
               const SizedBox(width: AppTheme.s10),
-              Text('The Mwendo Academy',
+              Text(L10n.tr('academy', locale),
                   style: text.titleLarge!.copyWith(color: Colors.white)),
             ],
           ),
           const SizedBox(height: AppTheme.s12),
           Text(
-            'Learn the science, the technique, and the heritage of East African running.',
+            L10n.tr('learn_hero_body', locale),
             style: text.bodyLarge!.copyWith(color: Colors.white.withValues(alpha: 0.9)),
           ),
         ],
@@ -129,7 +132,8 @@ class _Hero extends StatelessWidget {
 class _CourseCard extends StatelessWidget {
   final Course course;
   final int done;
-  const _CourseCard({required this.course, required this.done});
+  final AppLocale locale;
+  const _CourseCard({required this.course, required this.done, required this.locale});
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +163,7 @@ class _CourseCard extends StatelessWidget {
               const SizedBox(height: AppTheme.s12),
               Text(course.title, style: text.titleMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
               const SizedBox(height: AppTheme.s4),
-              Text('${course.lessons.length} lessons · ${course.minutes} min',
+              Text('${course.lessons.length} ${L10n.tr('lessons', locale)} · ${course.minutes} min',
                   style: text.labelSmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
               const Spacer(),
               if (ratio > 0)
@@ -176,12 +180,12 @@ class _CourseCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppTheme.s6),
-                    Text('$done/${course.lessons.length} done',
+                    Text('$done/${course.lessons.length} ${L10n.tr('completed', locale)}',
                         style: text.labelSmall!.copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
                   ],
                 )
               else
-                Text('Start',
+                Text(L10n.tr('start', locale),
                     style: text.labelMedium!.copyWith(color: AppTheme.brand)),
             ],
           ),
@@ -192,6 +196,9 @@ class _CourseCard extends StatelessWidget {
 }
 
 class _LegendsTeaser extends StatelessWidget {
+  final AppLocale locale;
+  const _LegendsTeaser({required this.locale});
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -224,16 +231,16 @@ class _LegendsTeaser extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${legends.length} legendary runners',
+                      Text('${legends.length} ${L10n.tr('legendary_runners', locale)}',
                           style: text.titleMedium),
                       const SizedBox(height: AppTheme.s4),
-                      Text('Keino to Kipyegon — their stories, records and quotes.',
+                      Text(L10n.tr('legends_teaser_sub', locale),
                           style: text.bodySmall!
                               .copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                const TrailingChevron(),
               ],
             ),
           ),
@@ -244,6 +251,9 @@ class _LegendsTeaser extends StatelessWidget {
 }
 
 class _BeatTeaser extends StatelessWidget {
+  final AppLocale locale;
+  const _BeatTeaser({required this.locale});
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -276,16 +286,16 @@ class _BeatTeaser extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Race a ghost legend',
+                      Text(L10n.tr('race_ghost_legend', locale),
                           style: text.titleMedium),
                       const SizedBox(height: AppTheme.s4),
-                      Text('Pit your pace against Kipchoge, Kipyegon and more.',
+                      Text(L10n.tr('race_ghost_sub', locale),
                           style: text.bodySmall!
                               .copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                const TrailingChevron(),
               ],
             ),
           ),

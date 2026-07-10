@@ -15,6 +15,7 @@ import 'package:mwendo_app/data/models/run_record.dart';
 import 'package:mwendo_app/data/repositories/activity_repository.dart';
 import 'package:mwendo_app/data/sample_activities.dart';
 import 'package:mwendo_app/widgets/skeleton.dart';
+import 'package:mwendo_app/widgets/trailing_chevron.dart';
 
 enum _Sort { date, distance, duration }
 
@@ -55,97 +56,115 @@ class _ActivityListPageState extends ConsumerState<ActivityListPage> {
 
     return Scaffold(
       appBar: AppBar(title: Text(L10n.tr('activity', locale)), centerTitle: false),
-      body: runs.when(
-        loading: () => ListView.separated(
-          padding: const EdgeInsets.all(AppTheme.s24),
-          itemCount: 3,
-          separatorBuilder: (_, index) => const SizedBox(height: AppTheme.s12),
-          itemBuilder: (_, index) => const SkeletonCard(height: 88),
-        ),
-        error: (_, _) => _EmptyState(text: text, cs: cs, locale: locale, onImportGpx: () => _importGpx(context, ref, locale)),
-        data: (real) {
-          final items = real.isNotEmpty ? real : <RunRecord>[];
-          if (items.isEmpty) return _EmptyState(text: text, cs: cs, locale: locale, onImportGpx: () => _importGpx(context, ref, locale));
-          final types = items.map((r) => r.type).toSet().toList()..sort();
-          final sorted = _apply(items);
-          return CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(AppTheme.s24, AppTheme.s16, AppTheme.s24, 0),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                _Chip(
-                                  label: L10n.tr('all', locale),
-                                  active: _typeFilter == null,
-                                  onTap: () => setState(() => _typeFilter = null),
+      body: AnimatedSwitcher(
+        duration: AppTheme.dMed,
+        transitionBuilder: (child, animation) =>
+            FadeTransition(opacity: animation, child: child),
+        child: runs.when(
+          loading: () => KeyedSubtree(
+            key: const ValueKey('activity-loading'),
+            child: ListView.separated(
+              padding: const EdgeInsets.all(AppTheme.s24),
+              itemCount: 3,
+              separatorBuilder: (_, index) => const SizedBox(height: AppTheme.s12),
+              itemBuilder: (_, index) => const SkeletonCard(height: 88),
+            ),
+          ),
+          error: (_, _) => KeyedSubtree(
+            key: const ValueKey('activity-error'),
+            child: _EmptyState(text: text, cs: cs, locale: locale),
+          ),
+          data: (real) {
+            final items = real.isNotEmpty ? real : <RunRecord>[];
+            if (items.isEmpty) {
+              return KeyedSubtree(
+                key: const ValueKey('activity-empty'),
+                child: _EmptyState(text: text, cs: cs, locale: locale),
+              );
+            }
+            final types = items.map((r) => r.type).toSet().toList()..sort();
+            final sorted = _apply(items);
+            return KeyedSubtree(
+              key: const ValueKey('activity-data'),
+              child: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(AppTheme.s24, AppTheme.s16, AppTheme.s24, 0),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _Chip(
+                                      label: L10n.tr('all', locale),
+                                      active: _typeFilter == null,
+                                      onTap: () => setState(() => _typeFilter = null),
+                                    ),
+                                    for (final t in types)
+                                      _Chip(
+                                        label: t,
+                                        active: _typeFilter == t,
+                                        onTap: () => setState(() => _typeFilter = t),
+                                      ),
+                                  ],
                                 ),
-                                for (final t in types)
-                                  _Chip(
-                                    label: t,
-                                    active: _typeFilter == t,
-                                    onTap: () => setState(() => _typeFilter = t),
-                                  ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppTheme.s8),
-                    Row(
-                      children: [
-                        Text(L10n.tr('sort', locale),
-                            style: text.labelMedium!.copyWith(
-                                color: cs.onSurface.withValues(alpha: 0.6))),
-                        const SizedBox(width: AppTheme.s8),
-                        DropdownButton<_Sort>(
-                          value: _sort,
-                          underline: const SizedBox.shrink(),
-                          items: [
-                            DropdownMenuItem(
-                                value: _Sort.date,
-                                child: Text(L10n.tr('sort_date', locale))),
-                            DropdownMenuItem(
-                                value: _Sort.distance,
-                                child: Text(L10n.tr('sort_distance', locale))),
-                            DropdownMenuItem(
-                                value: _Sort.duration,
-                                child: Text(L10n.tr('sort_duration', locale))),
                           ],
-                          onChanged: (s) => setState(() => _sort = s!),
                         ),
-                        const Spacer(),
-                        TextButton.icon(
-                          icon: const Icon(Icons.file_download_outlined, size: 18),
-                          label: Text(L10n.tr('export_json', locale)),
-                          onPressed: () => _exportJson(context, ref, locale, sorted),
+                        const SizedBox(height: AppTheme.s8),
+                        Row(
+                          children: [
+                            Text(L10n.tr('sort', locale),
+                                style: text.labelMedium!.copyWith(
+                                    color: cs.onSurface.withValues(alpha: 0.6))),
+                            const SizedBox(width: AppTheme.s8),
+                            DropdownButton<_Sort>(
+                              value: _sort,
+                              underline: const SizedBox.shrink(),
+                              items: [
+                                DropdownMenuItem(
+                                    value: _Sort.date,
+                                    child: Text(L10n.tr('sort_date', locale))),
+                                DropdownMenuItem(
+                                    value: _Sort.distance,
+                                    child: Text(L10n.tr('sort_distance', locale))),
+                                DropdownMenuItem(
+                                    value: _Sort.duration,
+                                    child: Text(L10n.tr('sort_duration', locale))),
+                              ],
+                              onChanged: (s) => setState(() => _sort = s!),
+                            ),
+                            const Spacer(),
+                            TextButton.icon(
+                              icon: const Icon(Icons.file_download_outlined, size: 18),
+                              label: Text(L10n.tr('export_json', locale)),
+                              onPressed: () => _exportJson(context, ref, locale, sorted),
+                            ),
+                          ],
                         ),
-                      ],
+                      ]),
                     ),
-                  ]),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.all(AppTheme.s24),
-                sliver: SliverList.separated(
-                  separatorBuilder: (_, index) => const SizedBox(height: AppTheme.s12),
-                  itemCount: sorted.length,
-                  itemBuilder: (_, i) => _ActivityTile(
-                    a: sorted[i].toSampleActivity(),
-                    onExportGpx: () => _exportGpx(context, ref, locale, sorted[i]),
                   ),
-                ),
-              ),
-            ],
-          );
-        },
+                  SliverPadding(
+                    padding: const EdgeInsets.all(AppTheme.s24),
+                    sliver: SliverList.separated(
+                      separatorBuilder: (_, index) => const SizedBox(height: AppTheme.s12),
+                      itemCount: sorted.length,
+                      itemBuilder: (_, i) => _ActivityTile(
+                        a: sorted[i].toSampleActivity(),
+                        onExportGpx: () => _exportGpx(context, ref, locale, sorted[i]),
+                      ),
+                    ),
+                  ),
+                ],
+              ));
+          },
+        ),
       ),
       floatingActionButton: !runs.isLoading
           ? FloatingActionButton.extended(
@@ -187,13 +206,6 @@ class _ActivityListPageState extends ConsumerState<ActivityListPage> {
     }
   }
 
-  void _importGpx(BuildContext context, WidgetRef ref, AppLocale locale) {
-    // ponytail: file_picker is intentionally not a dependency. GPX parsing is
-    // available (gpx_parser.dart); wiring a platform picker is a follow-up.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(L10n.tr('import_gpx_action', locale))),
-    );
-  }
 }
 
 class _Chip extends StatelessWidget {
@@ -228,12 +240,10 @@ class _EmptyState extends StatelessWidget {
   final TextTheme text;
   final ColorScheme cs;
   final AppLocale locale;
-  final VoidCallback? onImportGpx;
   const _EmptyState({
     required this.text,
     required this.cs,
     required this.locale,
-    this.onImportGpx,
   });
 
   @override
@@ -263,12 +273,9 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppTheme.s16),
             TextButton.icon(
-              onPressed: () {
-                Haptics.light();
-                onImportGpx?.call();
-              },
+              onPressed: null,
               icon: const Icon(Icons.file_upload_outlined, size: 18),
-              label: Text(L10n.tr('import_gpx_action', locale)),
+              label: Text('${L10n.tr('import_gpx_action', locale)} — Coming soon'),
             ),
           ],
         ),
@@ -326,7 +333,7 @@ class _ActivityTile extends ConsumerWidget {
                 tooltip: L10n.tr('export_gpx', locale),
                 onPressed: onExportGpx,
               ),
-              const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+              const TrailingChevron(),
             ],
           ),
         ),

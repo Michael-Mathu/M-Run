@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mwendo_app/core/gamification/gamification_provider.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/features/learn/data/courses.dart';
 
 class LessonPage extends ConsumerStatefulWidget {
@@ -25,6 +26,7 @@ class _LessonPageState extends ConsumerState<LessonPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: Text('Lesson ${widget.index + 1}'),
         centerTitle: false,
         backgroundColor: Colors.transparent,
@@ -86,7 +88,7 @@ class _LessonPageState extends ConsumerState<LessonPage> {
                             SnackBar(
                               content: const Text('Lesson complete · +15 XP'),
                               behavior: SnackBarBehavior.floating,
-                              backgroundColor: AppTheme.darkElevated,
+                              backgroundColor: Theme.of(context).snackBarTheme.backgroundColor,
                             ),
                           );
                         }

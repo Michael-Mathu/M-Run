@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
+import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/features/activity/activity_detail_page.dart';
 import 'package:mwendo_app/features/activity/activity_list_page.dart';
 import 'package:mwendo_app/features/auth/auth_page.dart';
@@ -21,8 +23,8 @@ import 'package:mwendo_app/features/tracking/live_dashboard.dart';
 import 'package:mwendo_app/features/tracking/tracking_controller.dart';
 import 'package:mwendo_app/core/utils/haptics.dart';
 
-/// Slide-up + fade page transition used across the app for a snappy,
-/// Strava/NRC-like feel: 6% upward slide, 200ms, easeOutCubic.
+/// Slide-up + fade transition for pushed/drilled-down routes (detail pages,
+/// full-screen flows): 6% upward slide, 200ms, easeOutCubic.
 CustomTransitionPage<void> _slidePage(GoRouterState state, Widget child) {
   return CustomTransitionPage<void>(
     key: state.pageKey,
@@ -43,13 +45,45 @@ CustomTransitionPage<void> _slidePage(GoRouterState state, Widget child) {
   );
 }
 
-GoRouter makeRouter(Ref ref) => GoRouter(
+/// Cross-fade transition for tab switches within the [StatefulShellRoute].
+/// Tab changes should NOT feel like a push — they dissolve between branches.
+CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 200),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+        child: child,
+      );
+    },
+  );
+}
+
+GoRouter makeRouter(Ref ref) {
+  // Redirect-loop guard: a successful route settlement resets the counter, so
+  // a redirect that keeps bouncing (e.g. auth ⇄ onboarding) is capped and
+  // falls through to home instead of freezing the app.
+  var redirectHops = 0;
+  return GoRouter(
       initialLocation: '/',
+      observers: [
+        _RouteSettledObserver(() => redirectHops = 0),
+      ],
       redirect: (context, state) async {
         final done = await ref.read(onboardingDoneProvider.future);
         final loc = state.matchedLocation;
-        if (!done && loc != '/onboarding') return '/onboarding';
-        if (done && loc == '/onboarding') return '/';
+        if (!done && loc != '/onboarding') {
+          if (++redirectHops > 10) return '/';
+          return '/onboarding';
+        }
+        if (done && loc == '/onboarding') {
+          if (++redirectHops > 10) return '/';
+          return '/';
+        }
+        redirectHops = 0;
         return null;
       },
       routes: [
@@ -61,7 +95,7 @@ GoRouter makeRouter(Ref ref) => GoRouter(
                 GoRoute(
                   path: '/',
                   pageBuilder: (context, state) =>
-                      _slidePage(state, const DashboardPage()),
+                      _fadePage(state, const DashboardPage()),
                 ),
               ],
             ),
@@ -70,7 +104,7 @@ GoRouter makeRouter(Ref ref) => GoRouter(
                 GoRoute(
                   path: '/challenges',
                   pageBuilder: (context, state) =>
-                      _slidePage(state, const ChallengesLibraryPage()),
+                      _fadePage(state, const ChallengesLibraryPage()),
                 ),
                 GoRoute(
                   path: '/challenges/:slug',
@@ -86,7 +120,7 @@ GoRouter makeRouter(Ref ref) => GoRouter(
                 GoRoute(
                   path: '/run',
                   pageBuilder: (context, state) =>
-                      _slidePage(state, const LiveDashboard()),
+                      _fadePage(state, const LiveDashboard()),
                 ),
               ],
             ),
@@ -95,7 +129,7 @@ GoRouter makeRouter(Ref ref) => GoRouter(
                 GoRoute(
                   path: '/learn',
                   pageBuilder: (context, state) =>
-                      _slidePage(state, const LearnPage()),
+                      _fadePage(state, const LearnPage()),
                 ),
                 GoRoute(
                   path: '/learn/course/:slug',
@@ -133,7 +167,7 @@ GoRouter makeRouter(Ref ref) => GoRouter(
                 GoRoute(
                   path: '/profile',
                   pageBuilder: (context, state) =>
-                      _slidePage(state, const ProfilePage()),
+                      _fadePage(state, const ProfilePage()),
                 ),
               ],
             ),
@@ -175,6 +209,24 @@ GoRouter makeRouter(Ref ref) => GoRouter(
         ),
       ],
     );
+}
+
+/// Resets the redirect-loop counter whenever a route is actually pushed,
+/// popped, or replaced, so the cap only trips on genuine redirect storms.
+class _RouteSettledObserver extends NavigatorObserver {
+  final VoidCallback onSettle;
+  _RouteSettledObserver(this.onSettle);
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previous) => onSettle();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previous) => onSettle();
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      onSettle();
+}
 
 final appRouterProvider = Provider<GoRouter>((ref) => makeRouter(ref));
 
@@ -218,12 +270,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          // System back button: go to home tab if not already there.
-          if (widget.shell.currentIndex != 0) {
-            widget.shell.goBranch(0);
-          }
-        }
+        if (!didPop) onAppBack(context);
       },
       child: Scaffold(
         body: GestureDetector(
@@ -316,7 +363,7 @@ class _RunNavIconState extends ConsumerState<_RunNavIcon>
   Widget build(BuildContext context) {
     final recording =
         ref.watch(trackingModelProvider).state == AppEngineState.recording;
-    const base = Color(0xFFFF5A1F);
+    const base = AppTheme.brand;
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, _) {
@@ -325,11 +372,7 @@ class _RunNavIconState extends ConsumerState<_RunNavIcon>
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFF5A1F), Color(0xFFFF8A3D)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            gradient: AppTheme.brandGradient,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(

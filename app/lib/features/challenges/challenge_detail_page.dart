@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mwendo_app/core/gamification/gamification_provider.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
+import 'package:mwendo_app/core/navigation/navigation.dart';
 import 'package:mwendo_app/features/challenges/challenge_evaluator.dart';
 
 class ChallengeDetailPage extends ConsumerWidget {
@@ -29,7 +30,11 @@ class ChallengeDetailPage extends ConsumerWidget {
     final ctaRoute = toAcademy ? '/learn' : '/run';
 
     return Scaffold(
-      appBar: AppBar(title: Text(ch.title), centerTitle: false),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: Text(ch.title),
+        centerTitle: false,
+      ),
       body: CustomScrollView(
         slivers: [
           SliverPadding(

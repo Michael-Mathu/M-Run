@@ -6,15 +6,34 @@ import '../../core/network/api_client.dart';
 /// Remote leaderboard entry shape (mirrors backend `leaderboard.Entry`).
 class RemoteEntry {
   final String userId;
+  final String? displayName;
   final double score;
   final int rank;
-  const RemoteEntry({required this.userId, required this.score, required this.rank});
+  const RemoteEntry(
+      {required this.userId, this.displayName, required this.score, required this.rank});
 
   factory RemoteEntry.fromJson(Map<String, dynamic> j) => RemoteEntry(
         userId: j['user_id'] ?? '',
+        // Backend should emit a public display name; fall back to masking the
+        // stored email (never show it in the clear — privacy leak).
+        displayName: j['name'] as String? ?? j['display_name'] as String?,
         score: (j['score'] ?? 0).toDouble(),
         rank: j['rank'] ?? 0,
       );
+}
+
+/// Prefer the backend display name; otherwise mask an email user_id so the
+/// address is never exposed on the public board.
+String _displayName(RemoteEntry e) {
+  final n = e.displayName?.trim();
+  if (n != null && n.isNotEmpty) return n;
+  final id = e.userId;
+  if (!id.contains('@')) return id.isEmpty ? 'Runner' : id;
+  final local = id.split('@')[0];
+  final masked = local.length <= 2
+      ? local
+      : '${local[0]}${'•' * (local.length - 2)}${local[local.length - 1]}';
+  return '$masked@${id.split('@')[1]}';
 }
 
 /// Fetches the leaderboard from the backend and merges the local user in,
@@ -30,7 +49,7 @@ final remoteLeaderboardProvider =
         .toList();
     final remote = list
         .map((e) => LeaderboardEntry(
-              name: e.userId,
+              name: _displayName(e),
               xp: e.score.round(),
               flag: '🏃',
             ))

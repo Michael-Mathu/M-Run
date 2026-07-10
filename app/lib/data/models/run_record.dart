@@ -19,9 +19,14 @@ class RunRecord {
   final double elevationGainM;
   final int avgHeartRate;
   final int avgCadence;
+  // ponytail: route/elevation/pace/times are parallel arrays indexed by sample
+  // point. They MUST stay the same length and index-aligned — adding a point
+  // requires updating all four together (see runRecordFromSession). A future
+  // caller that appends to one without the others desyncs every consumer.
   final List<LatLng> route;
   final List<double> elevation; // m, per sampled point
   final List<double> pace; // min/km, per sampled point
+  final List<DateTime> times; // UTC timestamp per sampled point
 
   RunRecord({
     required this.id,
@@ -37,6 +42,7 @@ class RunRecord {
     required this.route,
     required this.elevation,
     required this.pace,
+    required this.times,
   });
 
   double get avgPaceMinPerKm =>
@@ -58,6 +64,7 @@ class RunRecord {
             .toList(),
         elevation: (j['elevation'] as List).map((e) => (e as num).toDouble()).toList(),
         pace: (j['pace'] as List).map((p) => (p as num).toDouble()).toList(),
+        times: (j['times'] as List).map((t) => DateTime.parse(t as String)).toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -74,6 +81,7 @@ class RunRecord {
         'route': route.map((p) => [p.latitude, p.longitude]).toList(),
         'elevation': elevation,
         'pace': pace,
+        'times': times.map((t) => t.toUtc().toIso8601String()).toList(),
       };
 
   SampleActivity toSampleActivity() => SampleActivity(
@@ -89,6 +97,7 @@ class RunRecord {
         route: route,
         elevation: elevation,
         pace: pace,
+        times: times,
       );
 
   static String newId() => const Uuid().v4();
@@ -109,12 +118,14 @@ RunRecord runRecordFromSession({
   final route = <LatLng>[];
   final elevation = <double>[];
   final pace = <double>[];
+  final times = <DateTime>[];
   int hrSum = 0;
   int hrCount = 0;
   for (final p in trackPoints) {
     route.add(LatLng(p.lat, p.lng));
     elevation.add(p.elevation);
     pace.add(p.speedMps > 0.3 ? 1000 / (p.speedMps * 60) : 0.0);
+    times.add(p.timestamp);
     if (p.heartRate != null) {
       hrSum += p.heartRate!;
       hrCount++;
@@ -123,6 +134,9 @@ RunRecord runRecordFromSession({
   final startedAt = trackPoints.isNotEmpty
       ? trackPoints.first.timestamp
       : DateTime.now();
+  assert(route.length == elevation.length &&
+      elevation.length == pace.length &&
+      pace.length == times.length);
   return RunRecord(
     id: RunRecord.newId(),
     type: type,
@@ -137,6 +151,7 @@ RunRecord runRecordFromSession({
     route: route,
     elevation: elevation,
     pace: pace,
+    times: times,
   );
 }
 

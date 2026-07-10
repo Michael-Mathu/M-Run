@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:mwendo_app/core/gamification/gamification_provider.dart';
 import 'package:mwendo_app/core/l10n/app_strings.dart';
+import 'package:mwendo_app/core/permissions/location_permission.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
 import 'package:mwendo_app/core/utils/haptics.dart';
@@ -26,6 +28,22 @@ class DashboardPage extends ConsumerStatefulWidget {
 
 class _DashboardPageState extends ConsumerState<DashboardPage> {
   bool _corruptionShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ask for foreground location up front (the "beginning" screen) so the run
+    // screen is friction-free and the map shows the user dot immediately. The
+    // always/background upgrade is still requested at run start.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _requestLocation();
+    });
+  }
+
+  Future<void> _requestLocation() async {
+    if (await Permission.location.isGranted) return;
+    if (mounted) await ensureLocationPermission(context, ref);
+  }
 
   @override
   Widget build(BuildContext context) {

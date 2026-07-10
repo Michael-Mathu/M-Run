@@ -46,6 +46,7 @@ class MwendoTrackingService : Service() {
     private var lastLat = 0.0
     private var lastLng = 0.0
     private var lastTime = 0L
+    private var hasLast = false
     // True once the service has successfully entered the foreground. If this
     // stays false the run must not be treated as recording (see onStartCommand).
     var foregroundReady = false
@@ -103,6 +104,10 @@ class MwendoTrackingService : Service() {
     }
 
     fun resume() {
+        // Re-seed the last-fix anchor so the paused duration isn't counted as
+        // moving time on the first fix after resume.
+        lastTime = System.currentTimeMillis()
+        hasLast = false
         val request = LocationRequest.Builder(5000L)
             .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
             .build()
@@ -137,17 +142,22 @@ class MwendoTrackingService : Service() {
     private fun processLocation(location: Location) {
         val speedMps = maxOf(0.0, location.speed.toDouble())
         val state = classifyState(speedMps)
-        if (lastLat != 0.0 && lastLng != 0.0) {
+        if (hasLast) {
             val d = FloatArray(1)
             Location.distanceBetween(lastLat, lastLng, location.latitude, location.longitude, d)
             distanceM += d[0]
             if (state == "run" || state == "walk") {
-                movingTimeMs += (location.time - lastTime)
+                val gap = location.time - lastTime
+                // Out-of-order fixes or GPS clock corrections can yield negative
+                // or huge gaps; only count sane, positive deltas so paused time
+                // (and clock jitter) doesn't inflate moving time.
+                if (gap > 0 && gap < 60_000) movingTimeMs += gap
             }
         }
         lastLat = location.latitude
         lastLng = location.longitude
         lastTime = location.time
+        hasLast = true
         try {
             listener?.onLocation(
                 mapOf(

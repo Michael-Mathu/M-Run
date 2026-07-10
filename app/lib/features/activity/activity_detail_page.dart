@@ -115,7 +115,6 @@ class _StatsGrid extends StatelessWidget {
       (formatDuration(a.durationMs), L10n.tr('time', locale)),
       (a.calories.toString(), L10n.tr('calories', locale)),
       (a.elevationGainM.toStringAsFixed(0), L10n.tr('elev_gain', locale)),
-      (a.avgCadence > 0 ? a.avgCadence.toString() : '--', 'CAD'),
     ];
     return GridView.count(
       crossAxisCount: 3,

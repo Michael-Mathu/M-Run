@@ -40,7 +40,7 @@ leaderboards.
 - **Native GPS engine** — a custom Flutter plugin (Kotlin on Android, Swift on iOS) keeps
   recording through a foreground service / background location session, so a run survives a locked
   screen or a backgrounded app.
-- **Live dashboard** — distance, elapsed time, current & average pace, speed, heart rate, cadence,
+- **Live dashboard** — distance, elapsed time, current & average pace, speed,
   elevation gain, and calories update in real time.
 - **Smart Time Tracking** — distinguishes between total elapsed time and actual moving time, seamlessly pausing the running pace calculation when you are stationary.
 - **Live map** — a breadcrumb trail and current-location marker that follow you as you move.

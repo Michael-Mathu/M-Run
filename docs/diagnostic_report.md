@@ -13,6 +13,14 @@
 > tests pass. See `docs/audit.md` "Fixes Applied — Run-sequence crash & map
 > zoom" for the per-bug mapping (C1→#9, C2→#10, Z1→#11, C3→#12, C4→#13).
 > Phase 4 (manual device + logcat confirmation) remains the user's to run.
+>
+> **Refreshed 2026-07-10.** The run path has since been further refined (see
+> `docs/audit.md` §18): foreground location is now requested on the home screen
+> with the `Always`/background upgrade deferred to run start (no longer
+> hard-blocking iOS); the engine moving-time calc was fixed in both Kotlin and
+> Swift; `_stopTicker`'s dead `isPaused` param was removed; and the tab-swipe
+> gesture no longer intercepts map pans on the Run tab. `flutter analyze`
+> remains clean.
 
 ---
 

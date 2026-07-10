@@ -245,6 +245,9 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
   static const _branchCount = 5;
 
   void _onHorizontalDragEnd(DragEndDetails details) {
+    // Skip on the Run tab (index 2): the live map owns horizontal pans there,
+    // and intercepting them as tab swipes fought the map's gesture handling.
+    if (widget.shell.currentIndex == 2) return;
     final v = details.primaryVelocity;
     if (v == null || v.abs() < 300) return;
     final i = widget.shell.currentIndex;

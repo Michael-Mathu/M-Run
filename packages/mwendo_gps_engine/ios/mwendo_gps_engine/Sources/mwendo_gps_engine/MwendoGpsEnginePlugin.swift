@@ -12,6 +12,7 @@ public class MwendoGpsEnginePlugin: NSObject, FlutterPlugin, CLLocationManagerDe
     var lastLat: Double = 0
     var lastLng: Double = 0
     var lastTime: Int = 0
+    var hasLast: Bool = false
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let methodChannel = FlutterMethodChannel(name: "mwendo_gps_engine", binaryMessenger: registrar.messenger())
@@ -71,6 +72,10 @@ public class MwendoGpsEnginePlugin: NSObject, FlutterPlugin, CLLocationManagerDe
     }
 
     private func resume(result: FlutterResult) {
+        // Re-seed the last-fix anchor so the paused duration isn't counted as
+        // moving time on the first fix after resume.
+        lastTime = Int(Date().timeIntervalSince1970 * 1000)
+        hasLast = false
         locationManager?.startUpdatingLocation()
         result(nil)
     }
@@ -96,17 +101,23 @@ public class MwendoGpsEnginePlugin: NSObject, FlutterPlugin, CLLocationManagerDe
         let speed = location.speed
         let state = classifyState(speed)
         
-        if lastLat != 0 && lastLng != 0 {
+        if hasLast {
             let distance = calculateDistance(lat1: lastLat, lng1: lastLng, lat2: location.coordinate.latitude, lng2: location.coordinate.longitude)
             distanceM += distance
             if state == "run" || state == "walk" {
-                movingTimeMs += Int(location.timestamp.timeIntervalSince1970 * 1000) - lastTime
+                let gap = Int(location.timestamp.timeIntervalSince1970 * 1000) - lastTime
+                // Out-of-order fixes or clock corrections can yield negative or
+                // huge gaps; only count sane, positive deltas.
+                if gap > 0 && gap < 60000 {
+                    movingTimeMs += gap
+                }
             }
         }
         
         lastLat = location.coordinate.latitude
         lastLng = location.coordinate.longitude
         lastTime = Int(location.timestamp.timeIntervalSince1970 * 1000)
+        hasLast = true
         
         eventSink?([
             "lat": location.coordinate.latitude,

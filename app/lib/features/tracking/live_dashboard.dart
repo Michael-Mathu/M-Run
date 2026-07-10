@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:mwendo_app/core/permissions/location_permission.dart';
 import 'package:mwendo_app/core/theme/app_theme.dart';
 import 'package:mwendo_app/core/utils/format.dart';
 import 'package:mwendo_app/core/utils/haptics.dart';
@@ -202,25 +202,6 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                           child: Row(
                             children: [
                               _buildSecondaryMetric(
-                                icon: Icons.favorite_rounded,
-                                value: m.heartRate?.toString() ?? '--',
-                                unit: 'bpm',
-                                color: m.heartRate != null
-                                    ? AppTheme.hrZones[math.min(
-                                        4,
-                                        ((m.heartRate! - 110) ~/ 20).clamp(0, 4),
-                                      )]
-                                    : cs.onSurface.withValues(alpha: 0.5),
-                              ),
-                              _buildDivider(cs),
-                              _buildSecondaryMetric(
-                                icon: Icons.trending_up_rounded,
-                                value: m.cadence?.toString() ?? '--',
-                                unit: 'spm',
-                                color: cs.onSurface,
-                              ),
-                              _buildDivider(cs),
-                              _buildSecondaryMetric(
                                 icon: Icons.terrain_rounded,
                                 value: m.elevationGainM.toStringAsFixed(0),
                                 unit: 'm',
@@ -363,42 +344,26 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
 
   Future<void> _requestAndStart(WidgetRef ref, BuildContext context) async {
     Haptics.medium();
-    final status = await Permission.locationWhenInUse.request();
-    if (status.isPermanentlyDenied) {
-      if (context.mounted) _showGpsOverlay(context);
-      return;
-    }
-    if (!status.isGranted) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(L10n.tr('gps_permission_required', ref.read(localeProvider))),
-            action: SnackBarAction(
-              label: L10n.tr('open_settings', ref.read(localeProvider)),
-              onPressed: () => openAppSettings(),
-            ),
-          ),
-        );
-      }
-      return;
-    }
-    // Android 10+ throttles a backgrounded foreground `location` service to
-    // near-zero updates unless the user grants "Allow all the time". Without
-    // this, the run freezes the moment the screen locks.
+    // Foreground location is normally granted already (asked on the home
+    // screen); this is the fallback if the user launched straight here or
+    // denied it there.
+    final ok = await ensureLocationPermission(context, ref);
+    if (!ok) return;
+    // Background location lets the foreground service keep updating after the
+    // screen locks. iOS "While Using" users keep recording foreground-only — we
+    // no longer block the run on it (fixes iOS lockout + App Store rejection
+    // risk). The run just won't survive a screen-off on those devices.
     final background = await Permission.locationAlways.request();
     if (context.mounted && !background.isGranted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(L10n.tr('grant_background_location', ref.read(localeProvider))),
           action: SnackBarAction(
-            label: 'Settings',
+            label: L10n.tr('open_settings', ref.read(localeProvider)),
             onPressed: () => openAppSettings(),
           ),
         ),
       );
-      // Don't start the run without background permission — location updates
-      // will freeze when the screen locks, producing a broken run (fixes Bug #10).
-      return;
     }
     final notif = await Permission.notification.request();
     if (context.mounted && !notif.isGranted) {
@@ -416,63 +381,6 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
     // A run just started with permission granted — refresh so the map shows
     // the user-location dot without polling permission on every GPS tick.
     _refreshLocationPermission();
-  }
-
-  /// Full-screen explanation shown when location permission is permanently
-  /// denied (Strava-style) so the user understands why it's needed and can
-  /// jump straight to system Settings.
-  void _showGpsOverlay(BuildContext context) {
-    final locale = ref.read(localeProvider);
-    final cs = Theme.of(context).colorScheme;
-    final surface = Theme.of(context).dialogTheme.backgroundColor ?? cs.surface;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dlg) => Dialog(
-        backgroundColor: surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.r24)),
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.s24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppTheme.brand.withValues(alpha: 0.16),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.location_on_rounded, color: AppTheme.brand, size: 36),
-              ),
-              const SizedBox(height: AppTheme.s16),
-              Text(L10n.tr('gps_required_title', locale),
-                  style: TextStyle(color: cs.onSurface, fontSize: 20, fontWeight: FontWeight.w700),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: AppTheme.s8),
-              Text(L10n.tr('gps_required_body', locale),
-                  style: TextStyle(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
-              const SizedBox(height: AppTheme.s20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    Navigator.of(dlg).pop();
-                    openAppSettings();
-                  },
-                  child: Text(L10n.tr('open_settings', locale)),
-                ),
-              ),
-              const SizedBox(height: AppTheme.s4),
-              TextButton(
-                onPressed: () => Navigator.of(dlg).pop(),
-                child: Text(L10n.tr('cancel', locale)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void _onStop(WidgetRef ref) async {
@@ -537,6 +445,7 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
       final ok = await ref.read(sessionProvider.notifier).submitRun(
         distanceM: distanceM,
         durationMs: elapsedMs,
+        movingTimeMs: movingTimeMs,
         elevationGainM: elevationGainM,
         startedAt: trackPoints.isNotEmpty
             ? trackPoints.first.timestamp

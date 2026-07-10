@@ -2,6 +2,11 @@
 
 > Audited every file across `app/lib/`, `packages/`, and `backend/`.
 > Classification: **✅ Functional** · **⚠️ Partial/Stubbed** · **❌ Non-functional or Missing**
+>
+> **Last refreshed: 2026-07-10** — supersedes the original pre-fix audit. The
+> component verdicts below still hold; this refresh captures fixes and remaining
+> issues found in the latest full systems audit (see "Post-audit fixes applied"
+> and "Current known issues" below).
 
 ---
 
@@ -403,4 +408,54 @@
 | Profile/Settings | ✅ | ⚠️ decorative | n/a | ⚠️ | 40% |
 
 **Overall Phase 1+2 completion: ~60%** — Moving time and tracking accuracy improvements bumped the score to 60%.
+
+---
+
+## 18. Full Systems Audit — 2026-07-10
+
+A fresh end-to-end read of `app/lib` + `packages/mwendo_gps_engine` (the
+previous audit sections above remain valid). Findings and the fixes applied in
+this pass:
+
+### Fixes applied (this pass)
+- **HR / cadence UI removed.** The native engine never emitted `hr`/`cadence`,
+  so the live HR-zone + cadence tiles and the activity-detail cadence stat were
+  always `--`. Removed from `live_dashboard.dart` and `activity_detail_page.dart`
+  (the dead `dart:math` import went with it). Data-model fields kept.
+- **Leaderboard no longer leaks the email.** `leaderboard_provider.dart` mapped
+  `user_id` (which is the stored email) straight into the public board name; it
+  now prefers a backend `name`/`display_name` and masks any email fallback.
+- **`submitRun` sends real moving time.** `session_provider.dart` posted total
+  `durationMs` as `moving_time_ms`; it now takes and sends `movingTimeMs`.
+- **GPX export round-trips time + speed.** `gpxFromRunRecord` now emits
+  `<time>` (from new per-point `RunRecord.times`) and `<speed>` (derived from
+  pace); `pointsFromGpx` parses them back. `RunRecord`/`SampleActivity` gained a
+  `times` list.
+- **Engine moving-time bugs fixed (Kotlin + Swift).** Both engines used a
+  `lastLat != 0` sentinel (skips a legitimate (0,0) fix) and summed
+  `location.time - lastTime` with no guard (out-of-order fixes / clock jitter /
+  paused gaps inflated moving time). Replaced with a `hasLast` flag, a
+  `0 < gap < 60s` sanity clamp, and a `lastTime`/`hasLast` reset on `resume()`.
+- **Dead `_stopTicker({bool isPaused})` param removed** (never read).
+- **Tab swipe no longer fights the map.** `app_router.dart` now skips the
+  swipe-to-switch-tab gesture on the Run tab (index 2) so horizontal map pans
+  work.
+- **`RunRecord` parallel-array desync documented + guarded.** Fields carry a
+  `ponytail:` note on the index-alignment invariant; `runRecordFromSession`
+  asserts the four arrays stay equal length.
+
+### Current known issues (carried from audit; not yet fixed)
+- 🔴 **SOS still sends only the last contact** and **falls back to Nairobi** when
+  not actively recording (out of scope this pass — explicitly excluded).
+- 🔴 **No GPS outlier / big-jump filter** — a single multipath fix still
+  inflates distance/pace (raw points remain the source of truth by design).
+- 🟡 `release.yml` builds a **debug** APK (can't ship to Play).
+- 🟡 Partial i18n — many hardcoded literals remain (celebration strings, empty
+  states, all challenge/legend *content*).
+- ⚪ `AppDatabase`/Drift tables are **stubs** by design (JSON-file persistence,
+  no migrations) — intentional MVP choice, left as-is.
+- ⚪ Thin test coverage on the run/safety math (only `back_navigation_test`).
+
+> Status of the earlier run-sequence crash fixes (C1–C4, Bug #1/#6/#7/#8/#10)
+> is unchanged and still verified: `flutter analyze` is clean.
 

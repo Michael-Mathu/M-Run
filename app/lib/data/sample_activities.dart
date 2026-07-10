@@ -16,6 +16,7 @@ class SampleActivity {
   final List<LatLng> route;
   final List<double> elevation; // metres, per sampled point
   final List<double> pace; // min/km, per sampled point
+  final List<DateTime> times; // UTC timestamp per sampled point
 
   SampleActivity({
     required this.id,
@@ -30,6 +31,7 @@ class SampleActivity {
     required this.route,
     required this.elevation,
     required this.pace,
+    required this.times,
   });
 
   double get avgPaceMinPerKm =>
@@ -62,6 +64,11 @@ class SampleActivity {
 
     final distanceM = 3200 + rnd.nextInt(6000).toDouble();
     final durationMs = (distanceM / 1000 * (5.5 * 60000)).round();
+    final stepMs = (durationMs / n).round();
+    final startedAt = DateTime.now().subtract(Duration(days: seed % 14));
+    final times = [
+      for (var i = 0; i < n; i++) startedAt.add(Duration(milliseconds: stepMs * i))
+    ];
     final elevationGainM = elevation.reduce((a, b) => a > b ? a : b) -
         elevation.reduce((a, b) => a < b ? a : b);
     final calories = (durationMs / 60000 * 11).round();
@@ -72,7 +79,7 @@ class SampleActivity {
     return SampleActivity(
       id: id,
       type: type,
-      startedAt: DateTime.now().subtract(Duration(days: seed % 14)),
+      startedAt: startedAt,
       distanceM: distanceM,
       durationMs: durationMs,
       calories: calories,
@@ -82,6 +89,7 @@ class SampleActivity {
       route: route,
       elevation: elevation,
       pace: pace,
+      times: times,
     );
   }
 }

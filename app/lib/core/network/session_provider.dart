@@ -89,6 +89,7 @@ class Session extends Notifier<SessionState> {
   Future<bool> submitRun({
     required double distanceM,
     required int durationMs,
+    required int movingTimeMs,
     required double elevationGainM,
     required DateTime startedAt,
     String type = 'Run',
@@ -100,7 +101,7 @@ class Session extends Notifier<SessionState> {
         'type': type,
         'started_at': startedAt.toUtc().toIso8601String(),
         'distance_m': distanceM,
-        'moving_time_ms': durationMs,
+        'moving_time_ms': movingTimeMs,
         'elevation_gain_m': elevationGainM,
       });
       await client.dio.post('/api/v1/leaderboard/submit');

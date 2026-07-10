@@ -129,7 +129,7 @@ class TrackingModel extends Notifier<TrackingState> {
     });
   }
 
-  void _stopTicker({bool isPaused = false}) {
+  void _stopTicker() {
     _ticker?.cancel();
     _ticker = null;
     if (_runStart != null) {
@@ -384,7 +384,7 @@ class TrackingModel extends Notifier<TrackingState> {
 
   void pause() => _enqueue(() async {
         _engine.pause();
-        _stopTicker(isPaused: true);
+        _stopTicker();
         _pendingWrite = _writeRecovery();
         await _pendingWrite;
         state = state.copyWith(state: AppEngineState.paused);

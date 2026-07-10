@@ -75,7 +75,11 @@ live map used `MyLocationTrackingMode.none`.
   errors instead of swallowing. No defect.
 - `_writeRecovery`/`_clearRecovery` (`:137-171`): best-effort, swallow errors. Fine.
 - `_onPoint` (`:265-307`): haversine + elevation gain. Correct. Throttled recovery
-  every 10 points. No defect.
+  every 10 points. No defect. **Note (post-audit):** each raw point is also passed
+  through `_addDisplayPoint`, which maintains an EMA-smoothed lat/lng (alpha chosen
+  from `accuracy`) and drops points within 5m of the last drawn one. Smoothed points
+  go to `_displayPts` (exposed via `displayPoints`) for the live map polyline only;
+  `_pts`/`points` stay raw and feed the DB, distance, pace, and SOS.
 
 ### 2.5 GPS engine — Dart (`packages/mwendo_gps_engine/lib/*`)
 - `MwendoGpsEngine()` ctor registers the platform impl once (`_registered`

@@ -95,7 +95,9 @@ class _LiveDashboardState extends ConsumerState<LiveDashboard> {
                         // mutates concurrently (fixes Bug #6).
                         points: [
                           for (final p
-                              in ref.read(trackingModelProvider.notifier).points)
+                              in ref
+                                  .read(trackingModelProvider.notifier)
+                                  .displayPoints)
                             LatLng(p.lat, p.lng),
                         ],
                         mode: MapMode.live,

@@ -39,3 +39,10 @@ final summary = await engine.stop(); // RecordingSummary
 Adaptive hysteresis state machine, GPS watchdog, big-jump multipath filter, and a
 real-time Kalman smoother still live on the tracking-quality roadmap (see blueprint
 Phase 1 / "F — Tracking quality").
+
+> **Note:** light smoothing already happens one layer up, in the app's
+> `TrackingModel` (`tracking_controller.dart`). The live map polyline is fed an
+> EMA-smoothed, 5m noise-culled copy of each fix (`_addDisplayPoint` /
+> `displayPoints`), with the smoothing factor driven by `accuracy`. The raw
+> `TrackPoint`s emitted by *this* engine are unchanged — they remain the source of
+> truth for stored distance, pace, and SOS.

@@ -73,7 +73,18 @@ class TrackingModel extends Notifier<TrackingState> {
   DateTime? _movingStart;
   StreamSubscription<TrackPoint>? _sub;
 
-  // Serial command queue — prevents start/stop/pause race conditions during
+  // ponytail: the live map polyline is decoupled from the raw GPS stream.
+  // Raw points remain the source of truth (DB / GPX / distance / SOS); the
+  // EMA-smoothed, noise-culled _displayPts is what the map actually draws.
+  // Ceiling: a single fixed EMA with the accuracy→alpha table below can't
+  // recover path shape on its own — upgrade to a Kalman filter if lag shows.
+  final List<TrackPoint> _displayPts = [];
+  double _smoothLat = 0;
+  double _smoothLng = 0;
+  bool _hasSmooth = false;
+  static const double _cullMeters = 5.0;
+
+  /// Serial command queue — prevents start/stop/pause race conditions during
   // rapid pause/resume cycles (blueprint: "lock start/stop commands").
   Future<void>? _lock;
 
@@ -81,8 +92,11 @@ class TrackingModel extends Notifier<TrackingState> {
   /// before clearing, preventing a stale write from resurrecting a ghost run.
   Future<void>? _pendingWrite;
 
-  /// Expose raw points for the map without copying the full list every tick.
+  /// Raw GPS points — the source of truth for DB/ GPX/ distance/ SOS.
   List<TrackPoint> get points => _pts;
+
+  /// Smoothed, noise-culled points for the live map polyline.
+  List<TrackPoint> get displayPoints => _displayPts;
 
   @override
   TrackingState build() {
@@ -205,6 +219,7 @@ class TrackingModel extends Notifier<TrackingState> {
       _pts
         ..clear()
         ..addAll(pts);
+      _rebuildDisplay();
       _elevationGain = (j['elevationGainM'] as num?)?.toDouble() ?? 0;
       _accumulatedMs = (j['elapsedMs'] as num?)?.toInt() ?? 0;
       _accumulatedMovingMs = (j['movingTimeMs'] as num?)?.toInt() ?? 0;
@@ -244,6 +259,8 @@ class TrackingModel extends Notifier<TrackingState> {
       }
     }
     _pts.clear();
+    _displayPts.clear();
+    _hasSmooth = false;
     _elevationGain = 0;
     _accumulatedMs = 0;
     _accumulatedMovingMs = 0;
@@ -267,6 +284,7 @@ class TrackingModel extends Notifier<TrackingState> {
 
   void _onPoint(TrackPoint p) {
     _pts.add(p);
+    _addDisplayPoint(p);
     final isMoving = p.speedMps > 0.3;
     
     // Track moving time: start timer if speed > 0.3 m/s
@@ -312,6 +330,58 @@ class TrackingModel extends Notifier<TrackingState> {
     }
   }
 
+  /// Append a smoothed, noise-culled point to the live map view.
+  /// EMA blends the new raw fix into the running smoothed coordinate; points
+  /// within [_cullMeters] of the last drawn point are dropped so GPS jitter
+  /// on a near-stationary user doesn't zigzag the polyline.
+  void _addDisplayPoint(TrackPoint p) {
+    if (!_hasSmooth) {
+      _smoothLat = p.lat;
+      _smoothLng = p.lng;
+      _hasSmooth = true;
+    } else {
+      final a = _alphaForAccuracy(p.accuracy);
+      _smoothLat = a * p.lat + (1 - a) * _smoothLat;
+      _smoothLng = a * p.lng + (1 - a) * _smoothLng;
+    }
+    if (_displayPts.isNotEmpty) {
+      final d = _haversine(_displayPts.last.lat, _displayPts.last.lng,
+          _smoothLat, _smoothLng);
+      if (d < _cullMeters) return; // ponytail: drop GPS-noise micro-jitter
+    }
+    _displayPts.add(TrackPoint(
+      lat: _smoothLat,
+      lng: _smoothLng,
+      elevation: p.elevation,
+      timestamp: p.timestamp,
+      speedMps: p.speedMps,
+      heartRate: p.heartRate,
+      cadence: p.cadence,
+      accuracy: p.accuracy,
+      state: p.state,
+    ));
+  }
+
+  /// (Re)build the smoothed view from the raw points — used after restoring an
+  /// interrupted run so the map shows history without re-streaming GPS.
+  void _rebuildDisplay() {
+    _displayPts.clear();
+    _hasSmooth = false;
+    for (final p in _pts) {
+      _addDisplayPoint(p);
+    }
+  }
+
+  // ponytail: higher accuracy (smaller meters) → larger alpha (snappier);
+  // poor accuracy → smaller alpha (heavier smoothing). Unknown/0 → moderate.
+  static double _alphaForAccuracy(int accuracy) {
+    if (accuracy <= 0) return 0.4;
+    if (accuracy <= 5) return 0.4;
+    if (accuracy <= 10) return 0.3;
+    if (accuracy <= 20) return 0.2;
+    return 0.12;
+  }
+
   void pause() => _enqueue(() async {
         _engine.pause();
         _stopTicker(isPaused: true);
@@ -339,6 +409,8 @@ class TrackingModel extends Notifier<TrackingState> {
         // the file (fixes Bug #8).
         await _pendingWrite;
         _pts.clear(); // Clear points before recovery clear (fixes Bug #7)
+        _displayPts.clear();
+        _hasSmooth = false;
         _sub?.cancel();
         _sub = null;
         _stopTicker();

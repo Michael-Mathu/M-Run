@@ -267,7 +267,13 @@
 **Functional issues:**
 - ⚠️ **No foreground service** — location dies when app backgrounds on Android.
 - ⚠️ **No speed hysteresis** — the blueprint calls for dynamically switching GPS interval based on running speed (walking = 3s, running = 1s, sprinting = 0.5s). Not implemented.
-- ⚠️ **No Kalman filter** — raw GPS fixes are used as-is.
+- ⚠️ **No Kalman filter in the engine** — raw GPS fixes are still emitted as-is (the
+  true Kalman/RDP smoother remains on the blueprint roadmap). **Mitigated at the
+  app layer:** `TrackingModel` now feeds the live map polyline a separate
+  EMA-smoothed, noise-culled view (`_addDisplayPoint` — accuracy-driven alpha +
+  5m cull), while raw points remain the source of truth for the DB, distance,
+  pace, and SOS. So the stored route is still raw; only the on-screen line is
+  smoothed.
 
 ### mwendo_fit_parser
 

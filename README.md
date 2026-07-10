@@ -166,6 +166,11 @@ A few platform specifics worth knowing before you build or review:
   camera is set once and never moves, and the route redraws when points load asynchronously. Line
   drawing is serialized (`_isSyncing` / `_pendingCoords`), updated in place via `updateLine`, and
   stale lines are cleared when fewer than two points remain. `RouteMap` is a thin wrapper over
+- **Live polyline is EMA-smoothed, not raw.** `TrackingModel` keeps the raw GPS stream
+  (used for stored distance, pace, and SOS) but exposes a separate `displayPoints` view that
+  applies an accuracy-driven exponential-moving-average on lat/lng and drops sub-5m jitter, so
+  consumer-chip GPS noise doesn't zigzag the on-screen route. The `RouteMap` replay view still
+  uses the raw stored points.
   `MwendoMap` in `replay` mode.
 
 ---
